@@ -1,6 +1,7 @@
-# Staging site: the sibling of site.yml that ejects every showcase demo against the engine's
-# `main` (`bun pm pack` + `file:<tgz>`) instead of the published npm package, so a change is
-# readable before a release ships. Deploys to Cloudflare Pages.
+# Staging site: the sibling of site.yml that ejects every showcase demo against a packed engine
+# checkout (`bun pm pack` + `file:<tgz>`) instead of the published npm package. It builds from
+# the tag `engine.json` pins, same as production; dispatch with `ref` to preview another engine
+# ref. Deploys to Cloudflare Pages.
 #
 # The deploy step is skipped while the Cloudflare secrets are unset. `secrets.*` cannot be read
 # inside an `if:` expression, so their presence is derived once into a job-level env var.
@@ -12,6 +13,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Engine ref to build (defaults to the engine.json tag)
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -33,7 +39,11 @@ jobs:
 
       - run: bun install
 
-      - run: bun run engine --ref main
+      - name: Check out engine
+        env:
+          ENGINE_REF: ${{ inputs.ref }}
+        run: |
+          if [ -n "$ENGINE_REF" ]; then bun run engine --ref "$ENGINE_REF"; else bun run engine; fi
 
       # A fresh engine checkout has no rust/audio/pkg (gitignored build output that the
       # published tarball ships), so the pack would omit it and every demo's audio import
