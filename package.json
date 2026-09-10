@@ -14,7 +14,7 @@
         "@dylanebert/shallot": "0.9.5"
     },
     "devDependencies": {
-        "@biomejs/biome": "^2.5.10",
+        "@biomejs/biome": "^2.5.13",
         "@types/bun": "latest",
         "typescript": "^7.0.2"
     }
