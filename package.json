@@ -1,0 +1,21 @@
+{
+    "name": "shallot-site",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "engine": "bun run scripts/engine-checkout.ts",
+        "build": "bun run scripts/build-site.ts",
+        "pages": "bun run scripts/build-pages.ts",
+        "demos": "bun run scripts/demos.ts",
+        "check": "tsc --noEmit && biome check && bun run scripts/check-site.ts",
+        "test": "bun test src scripts"
+    },
+    "dependencies": {
+        "@dylanebert/shallot": "0.9.5"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.5.10",
+        "@types/bun": "latest",
+        "typescript": "^7.0.2"
+    }
+}
