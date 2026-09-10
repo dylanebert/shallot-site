@@ -1,0 +1,61 @@
+# Production site: builds every showcase demo from the engine checkout at the tag engine.json
+# pins, as an ejected consumer of the published package, and pushes out/site to the gh-pages
+# branch of dylanebert/shallot. That repo's Pages setting serves the branch, which keeps the URL
+# at https://dylanebert.com/shallot/. The push needs SHALLOT_PAGES_TOKEN: a fine-grained PAT
+# with contents: write on dylanebert/shallot.
+
+name: site
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # check-site.ts's artifact clauses red on an absent out/site instead of skipping
+      SITE_OUT_REQUIRED: "1"
+      RUM_CONFIG_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      # plain `bun install`: @types/bun floats with the installing bun's version
+      - run: bun install
+
+      - run: bun run engine
+
+      - run: bun run build
+
+      - run: bun run scripts/check-site.ts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: out/site
+
+      # Every generated path is relative (check-site.ts clause 4), so the output resolves under
+      # /shallot/ with no base-path rewrite. The custom domain lives on the dylanebert.github.io
+      # user site, so the project site needs no CNAME file of its own.
+      - name: Push to dylanebert/shallot gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.SHALLOT_PAGES_TOKEN }}
+          external_repository: dylanebert/shallot
+          publish_branch: gh-pages
+          publish_dir: out/site
+          force_orphan: true
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          full_commit_message: site ${{ github.sha }}

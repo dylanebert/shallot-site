@@ -1,0 +1,87 @@
+# Staging site: the sibling of site.yml that ejects every showcase demo against the engine's
+# `main` (`bun pm pack` + `file:<tgz>`) instead of the published npm package, so a change is
+# readable before a release ships. Deploys to Cloudflare Pages.
+#
+# The deploy step is skipped while the Cloudflare secrets are unset. `secrets.*` cannot be read
+# inside an `if:` expression, so their presence is derived once into a job-level env var.
+
+name: site-staging
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-staging-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SITE_OUT_REQUIRED: "1"
+      CF_DEPLOY_READY: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install
+
+      - run: bun run engine --ref main
+
+      # A fresh engine checkout has no rust/audio/pkg (gitignored build output that the
+      # published tarball ships), so the pack would omit it and every demo's audio import
+      # would fail to resolve.
+      - name: Add wasm32 target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Build audio wasm
+        working-directory: .engine/rust/audio
+        run: |
+          set -e
+          mkdir -p pkg
+          cargo build --target wasm32-unknown-unknown --release
+          WASM=target/wasm32-unknown-unknown/release/shallot_audio.wasm
+          if command -v wasm-opt >/dev/null 2>&1; then
+            wasm-opt -O3 --enable-simd --enable-nontrapping-float-to-int --enable-bulk-memory "$WASM" -o pkg/shallot_audio.wasm
+          else
+            cp "$WASM" pkg/shallot_audio.wasm
+          fi
+          cat > pkg/shallot_audio.js <<'EOF'
+          const url = new URL("shallot_audio.wasm", import.meta.url);
+          export default async function loadAudioWasm() {
+              const response = await fetch(url);
+              return response.arrayBuffer();
+          }
+          EOF
+          cat > pkg/shallot_audio.d.ts <<'EOF'
+          export default function loadAudioWasm(): Promise<ArrayBuffer>;
+          EOF
+
+      # the packed tarball ships the engine's dist/ tooling, which its prepack emits
+      - name: Build engine tooling
+        working-directory: .engine
+        run: bun install && bun run prepack
+
+      - run: bun run build --staging
+
+      - run: bun run scripts/check-site.ts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-staging
+          path: out/site
+
+      - name: Deploy to Cloudflare Pages
+        if: ${{ env.CF_DEPLOY_READY == 'true' }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy out/site --project-name=shallot-staging --branch=main
