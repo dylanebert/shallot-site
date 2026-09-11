@@ -25,6 +25,15 @@ import { ROSTER } from "../src/roster";
 import { datadogInitSnippet } from "../src/rum-config";
 import { demoFingerprints, type SiteMode, writeStamp } from "../src/site-stamp";
 import { buildBrand, bundleClient } from "./build-pages";
+import type { DemoPackage } from "./build-site-logic";
+import { rewriteSiteDependencies, workspaceExtensionDependencies } from "./build-site-logic";
+
+export {
+    nonWorkspaceShallotDependencies,
+    rewriteSiteDependencies,
+    shallotDependencies,
+    workspaceExtensionDependencies,
+} from "./build-site-logic";
 
 // the RUM init snippet lives in `src/rum-config.ts` so the pages build can inject it too;
 // re-exported here because the site tests import it from this module
@@ -86,48 +95,6 @@ function injectRum(dir: string, runtimeBundle: string, mode: "prod" | "staging")
         }
         writeFileSync(full, html.replace(closeBodyRe, `${snippet}</body>`));
     }
-}
-
-type DemoPackage = {
-    dependencies?: Record<string, string>;
-    devDependencies?: Record<string, string>;
-    [key: string]: unknown;
-};
-
-/** Workspace extensions are local site inputs even in production mode. The engine itself is
- * deliberately excluded: production continues to install its published release. */
-export function shallotDependencies(pkg: DemoPackage): [string, string][] {
-    return Object.entries(pkg.dependencies ?? {})
-        .filter(
-            ([name]) => name === "@dylanebert/shallot" || name.startsWith("@dylanebert/shallot-"),
-        )
-        .sort(([a], [b]) => a.localeCompare(b));
-}
-
-export function nonWorkspaceShallotDependencies(pkg: DemoPackage): [string, string][] {
-    return shallotDependencies(pkg).filter(([, pin]) => pin !== "workspace:*");
-}
-
-export function workspaceExtensionDependencies(pkg: DemoPackage): string[] {
-    return shallotDependencies(pkg)
-        .filter(([name, pin]) => name !== "@dylanebert/shallot" && pin === "workspace:*")
-        .map(([name]) => name);
-}
-
-export function rewriteSiteDependencies(
-    pkg: DemoPackage,
-    enginePin: string,
-    extensionPins: ReadonlyMap<string, string>,
-): DemoPackage {
-    const dependencies = pkg.dependencies;
-    if (!dependencies) return pkg;
-    if (dependencies["@dylanebert/shallot"]) dependencies["@dylanebert/shallot"] = enginePin;
-    for (const name of workspaceExtensionDependencies(pkg)) {
-        const pin = extensionPins.get(name);
-        if (!pin) throw new Error(`no packed tarball for workspace extension ${name}`);
-        dependencies[name] = pin;
-    }
-    return pkg;
 }
 
 async function main(): Promise<void> {
