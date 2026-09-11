@@ -390,7 +390,11 @@ function stampFresh(fixture: string, mode: SiteMode) {
 
 check(
     "check-site — a staging artifact stamped staging passes clean",
-    { claim: "check-site — a staging artifact stamped staging passes clean", size: "integration" },
+    {
+        claim: "check-site — a staging artifact stamped staging passes clean",
+        size: "integration",
+        subject: "engine.json",
+    },
     () => {
         requireSiteBuildPremise();
         const fixture = modeFixture("staging");
@@ -407,7 +411,11 @@ check(
 
 check(
     "check-site — a prod artifact stamped prod passes clean",
-    { claim: "check-site — a prod artifact stamped prod passes clean", size: "integration" },
+    {
+        claim: "check-site — a prod artifact stamped prod passes clean",
+        size: "integration",
+        subject: "engine.json",
+    },
     () => {
         requireSiteBuildPremise();
         const fixture = modeFixture("prod");
