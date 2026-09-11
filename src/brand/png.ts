@@ -40,10 +40,16 @@ export type DecodedPng = {
 };
 
 const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+const DECODER_CAPACITY = 64 * 1024 * 1024;
 
 /** Decode the 8-bit RGBA PNGs used by the engine's canonical brand assets. */
 export function decodePng(bytes: Uint8Array): DecodedPng {
-    if (!bytes.subarray(0, PNG_SIGNATURE.length).every((byte, i) => byte === PNG_SIGNATURE[i])) {
+    if (bytes.byteLength > DECODER_CAPACITY)
+        throw new Error("brand PNG: input exceeds decoder capacity");
+    if (
+        bytes.byteLength < PNG_SIGNATURE.length ||
+        !PNG_SIGNATURE.every((byte, i) => bytes[i] === byte)
+    ) {
         throw new Error("brand PNG: invalid signature");
     }
 
@@ -51,48 +57,99 @@ export function decodePng(bytes: Uint8Array): DecodedPng {
     let offset = PNG_SIGNATURE.length;
     let width = 0;
     let height = 0;
-    let bitDepth = 0;
-    let colorType = 0;
-    let interlace = 0;
+    let stride = 0;
+    let expected = 0;
+    let sawIhdr = false;
+    let sawIdat = false;
+    let idatClosed = false;
+    let sawIend = false;
+    let compressedLength = 0;
     const idat: Uint8Array[] = [];
+
     while (offset < bytes.byteLength) {
-        if (offset + 12 > bytes.byteLength) throw new Error("brand PNG: truncated chunk");
+        const remaining = bytes.byteLength - offset;
+        if (remaining < 12) throw new Error("brand PNG: truncated chunk");
         const length = view.getUint32(offset);
+        if (length > remaining - 12) throw new Error("brand PNG: truncated chunk");
         const type = String.fromCharCode(...bytes.subarray(offset + 4, offset + 8));
         const dataStart = offset + 8;
         const dataEnd = dataStart + length;
-        if (dataEnd + 4 > bytes.byteLength) throw new Error(`brand PNG: truncated ${type}`);
+        const end = dataEnd + 4;
+        const storedCrc = view.getUint32(dataEnd);
+        const actualCrc = crc32(bytes.subarray(offset + 4, dataEnd));
+        if (storedCrc !== actualCrc) throw new Error(`brand PNG: invalid ${type} CRC`);
+
+        if (!sawIhdr && type !== "IHDR") throw new Error("brand PNG: IHDR must be first");
+        if (type !== "IDAT" && sawIdat) idatClosed = true;
+        if (type !== "IHDR" && type !== "IDAT" && type !== "IEND" && type.charCodeAt(0) < 97) {
+            throw new Error(`brand PNG: unsupported critical chunk ${type}`);
+        }
+
         if (type === "IHDR") {
-            if (length !== 13) throw new Error("brand PNG: invalid IHDR");
+            if (sawIhdr || length !== 13) throw new Error("brand PNG: invalid IHDR");
+            sawIhdr = true;
             width = view.getUint32(dataStart);
             height = view.getUint32(dataStart + 4);
-            bitDepth = bytes[dataStart + 8] as number;
-            colorType = bytes[dataStart + 9] as number;
-            interlace = bytes[dataStart + 12] as number;
+            const bitDepth = bytes[dataStart + 8];
+            const colorType = bytes[dataStart + 9];
+            const compression = bytes[dataStart + 10];
+            const filterMethod = bytes[dataStart + 11];
+            const interlace = bytes[dataStart + 12];
+            if (
+                width === 0 ||
+                height === 0 ||
+                bitDepth !== 8 ||
+                colorType !== 6 ||
+                compression !== 0 ||
+                filterMethod !== 0 ||
+                interlace !== 0
+            ) {
+                throw new Error("brand PNG: expected a non-interlaced 8-bit RGBA image");
+            }
+            if (width > Math.floor((DECODER_CAPACITY - 1) / 4)) {
+                throw new Error("brand PNG: dimensions exceed decoder capacity");
+            }
+            stride = width * 4;
+            if (height > Math.floor(DECODER_CAPACITY / (stride + 1))) {
+                throw new Error("brand PNG: dimensions exceed decoder capacity");
+            }
+            expected = height * (stride + 1);
         } else if (type === "IDAT") {
+            if (!sawIhdr || idatClosed) throw new Error("brand PNG: invalid IDAT order");
+            sawIdat = true;
+            if (compressedLength > DECODER_CAPACITY - length) {
+                throw new Error("brand PNG: compressed data exceeds decoder capacity");
+            }
+            compressedLength += length;
             idat.push(bytes.slice(dataStart, dataEnd));
         } else if (type === "IEND") {
-            break;
+            if (!sawIhdr || !sawIdat || length !== 0 || sawIend || end !== bytes.byteLength) {
+                throw new Error("brand PNG: invalid IEND");
+            }
+            sawIend = true;
         }
-        offset = dataEnd + 4;
+        offset = end;
     }
-    if (!width || !height || bitDepth !== 8 || colorType !== 6 || interlace !== 0) {
-        throw new Error("brand PNG: expected a non-interlaced 8-bit RGBA image");
-    }
-    if (idat.length === 0) throw new Error("brand PNG: missing IDAT");
 
-    const stride = width * 4;
-    const filtered = new Uint8Array(
-        inflateSync(Buffer.concat(idat.map((chunk) => Buffer.from(chunk)))),
-    );
-    const expected = height * (stride + 1);
-    if (filtered.length !== expected) throw new Error("brand PNG: unexpected scanline length");
+    if (!sawIhdr || !sawIdat || !sawIend) throw new Error("brand PNG: incomplete image");
+
+    let inflated: Buffer;
+    try {
+        inflated = inflateSync(Buffer.concat(idat.map((part) => Buffer.from(part))), {
+            maxOutputLength: expected,
+        });
+    } catch {
+        throw new Error("brand PNG: invalid compressed image");
+    }
+    if (inflated.length !== expected) throw new Error("brand PNG: unexpected scanline length");
+
     const pixels = new Uint8Array(width * height * 4);
     const prior = new Uint8Array(stride);
     for (let y = 0; y < height; y++) {
         const rowStart = y * (stride + 1);
-        const filter = filtered[rowStart];
-        const row = filtered.subarray(rowStart + 1, rowStart + 1 + stride);
+        const filter = inflated[rowStart];
+        if (filter > 4) throw new Error(`brand PNG: unsupported filter ${filter}`);
+        const row = inflated.subarray(rowStart + 1, rowStart + 1 + stride);
         const decoded = pixels.subarray(y * stride, (y + 1) * stride);
         for (let i = 0; i < stride; i++) {
             const left = i >= 4 ? decoded[i - 4] : 0;
@@ -107,10 +164,7 @@ export function decodePng(bytes: Uint8Array): DecodedPng {
                         ? up
                         : filter === 3
                           ? Math.floor((left + up) / 2)
-                          : filter === 4
-                            ? paeth(left, up, upperLeft)
-                            : -1;
-            if (predictor < 0) throw new Error(`brand PNG: unsupported filter ${filter}`);
+                          : paeth(left, up, upperLeft);
             decoded[i] = (row[i] as number) + predictor;
         }
         prior.set(decoded);
