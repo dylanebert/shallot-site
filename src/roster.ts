@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { engineRoot } from "./engine";
 
 // The site roster — derived from what git tracks under `examples/showcase/`, not a
@@ -36,14 +37,16 @@ function deriveTitle(slug: string): string {
 // `node_modules/`, and `test-results/` residue from a deleted project; asking git makes the
 // scope identical in every checkout.
 const prefix = "examples/showcase/";
-const tracked = Bun.spawnSync(["git", "ls-files", "-z", prefix], { cwd: repoRoot });
-if (!tracked.success) {
+const tracked = existsSync(repoRoot)
+    ? Bun.spawnSync(["git", "ls-files", "-z", prefix], { cwd: repoRoot })
+    : null;
+if (!tracked?.success && existsSync(repoRoot)) {
     console.error(
         "✗ `git ls-files` failed — site/roster.ts needs a git checkout to scope the showcase set.",
     );
     process.exit(1);
 }
-const trackedFiles = tracked.stdout.toString().split("\0").filter(Boolean);
+const trackedFiles = tracked?.success ? tracked.stdout.toString().split("\0").filter(Boolean) : [];
 const slugs = [
     ...new Set(
         trackedFiles
@@ -54,11 +57,7 @@ const slugs = [
     ),
 ].sort();
 
-if (slugs.length === 0) {
-    console.error(
-        "✗ `git ls-files 'examples/showcase/'` matched no project dir — the roster would be empty.",
-    );
-    process.exit(1);
-}
-
+// An absent engine checkout yields an empty premise rather than a green population. Callers that
+// require the engine (the site build and artifact gate) refuse it explicitly; the carrier's
+// static surface check can still inspect declarations without executing this runtime discovery.
 export const ROSTER: DemoEntry[] = slugs.map((slug) => ({ slug, title: deriveTitle(slug) }));

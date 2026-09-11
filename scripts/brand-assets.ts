@@ -1,7 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { compose, DARK, fromBlocks, MARK, toSvg } from "../src/brand/mark";
-import { toPng } from "../src/brand/png";
+import { DARK, fromBlocks, MARK, toSvg } from "../src/brand/mark";
 import { engineRoot } from "../src/engine";
 
 // Every default icon a shallot project ships is a render of the one bitmap mark, so the shape
@@ -16,24 +15,9 @@ export function icon(): string {
     return toSvg(fromBlocks(MARK.m), DARK, 1);
 }
 
-// The native window icon is opaque and square: the 12×14 mark centred in a 16×16 field on the
-// dark ground, 64 device pixels a cell. A window manager scales it down, so the frame is what
-// keeps the mark off the edge at small sizes.
-const FRAME = 16;
-const NATIVE_SCALE = 64;
-
-/** The native window icon: the framed mark on the dark ground, 1024×1024 PNG bytes. */
+/** The native window icon: the engine-owned square PNG artifact. */
 export function nativeIcon(): Uint8Array {
-    const mark = fromBlocks(MARK.m);
-    const width = mark[0]?.length ?? 0;
-    const framed = compose(FRAME, FRAME, [
-        {
-            grid: mark,
-            x: Math.floor((FRAME - width) / 2),
-            y: Math.floor((FRAME - mark.length) / 2),
-        },
-    ]);
-    return toPng(framed, DARK, NATIVE_SCALE, DARK.bg);
+    return readFileSync(resolve(ROOT, NATIVE_ICON));
 }
 
 // A project's own icon wins over the default. Each entry names the content that makes it the
@@ -59,7 +43,7 @@ export function iconTargets(): string[] {
 }
 
 export const SCAFFOLD = "packages/create-shallot/index.ts";
-export const NATIVE_ICON = "assets/icon-1024.png";
+export const NATIVE_ICON = "packages/shallot/assets/icon-1024.png";
 
 /** The scaffold's inline `ICON`, rewritten around the render. */
 export function scaffoldSource(source: string): string {

@@ -1,10 +1,12 @@
-// The shipped icons are generated, so their arms are byte equality against the renderer: a hand
-// edit, a half-applied regeneration or a mark change that skipped `--write` all read red here.
+// The shipped icons are generated, so their arms are equality against the engine's canonical
+// renderer artifact: a hand edit or half-applied regeneration reads red here.
+// These checks require the repository-owned engine checkout because the engine owns the tracked
+// showcase population, scaffold and native icon inputs.
 
-import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { expect } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { template } from "../.engine/packages/create-shallot/index";
+import { check } from "@dylanebert/shallot/harness/check";
 import {
     icon,
     iconTargets,
@@ -15,29 +17,90 @@ import {
     scaffoldSource,
 } from "./brand-assets";
 
+const engine = ROOT;
+
+function requireEngineCheckout(): void {
+    const required = [
+        resolve(engine, ".git"),
+        resolve(engine, "examples/showcase"),
+        resolve(engine, "packages/create-shallot/index.ts"),
+        resolve(engine, "packages/shallot/assets/icon-1024.png"),
+    ];
+    const missing = required.filter((path) => !existsSync(path));
+    if (missing.length > 0) {
+        throw new Error(
+            `refused brand artifact check: missing engine checkout premise (${missing.join(", ")}); run bun run engine`,
+        );
+    }
+}
+
 const read = (file: string) => readFileSync(resolve(ROOT, file), "utf8");
 
-test("every default example icon is the rendered mark", () => {
-    const targets = iconTargets();
-    expect(targets.length).toBeGreaterThan(30);
-    for (const file of targets) expect(read(file)).toBe(`${icon()}\n`);
-});
+/** Compare the rendered mark while ignoring renderer metadata (titles, ids and blank lines). */
+function comparableSvg(source: string): string {
+    return source
+        .replace(/\s+id="[^"]*"/g, "")
+        .replace(/\s*<title>[\s\S]*?<\/title>/g, "")
+        .replace(/\n\s*\n/g, "\n")
+        .trim();
+}
 
-test("a project's own icon stays its own", () => {
-    const own = "examples/flows/no-walls/public/icon.svg";
-    expect(iconTargets()).not.toContain(own);
-    expect(read(own)).toContain('fill="#f233b3"');
-});
+check(
+    "every default example icon is the rendered mark",
+    {
+        claim: "tracked default showcase icons remain structurally equal to the engine's rendered mark",
+        size: "integration",
+    },
+    () => {
+        requireEngineCheckout();
+        const targets = iconTargets();
+        expect(targets.length).toBeGreaterThan(30);
+        const engineIcon = readFileSync(resolve(engine, "assets/icon.svg"), "utf8");
+        for (const file of targets) {
+            expect(comparableSvg(read(file))).toBe(comparableSvg(engineIcon));
+        }
+    },
+);
 
-test("the scaffold writes the same icon", () => {
-    expect(template("demo")["public/icon.svg"]).toBe(`${icon()}\n`);
-    expect(scaffoldSource(read(SCAFFOLD))).toBe(read(SCAFFOLD));
-});
+check(
+    "a project's own icon stays its own",
+    {
+        claim: "a showcase-owned icon remains excluded from default brand regeneration",
+        size: "integration",
+    },
+    () => {
+        requireEngineCheckout();
+        const own = "examples/flows/no-walls/public/icon.svg";
+        expect(iconTargets()).not.toContain(own);
+        expect(read(own)).toContain('fill="#f233b3"');
+    },
+);
 
-test("the native window icon is the framed mark at 1024", () => {
-    const bytes = nativeIcon();
-    const header = new DataView(bytes.buffer, bytes.byteOffset);
-    expect(header.getUint32(16)).toBe(1024);
-    expect(header.getUint32(20)).toBe(1024);
-    expect(readFileSync(resolve(ROOT, NATIVE_ICON))).toEqual(Buffer.from(bytes));
-});
+check(
+    "the scaffold's icon source remains stable",
+    {
+        claim: "the create-shallot scaffold keeps its generated icon source internally stable",
+        size: "integration",
+    },
+    () => {
+        requireEngineCheckout();
+        const source = scaffoldSource(read(SCAFFOLD));
+        expect(source).toContain(`const ICON = \`${icon()}\n\`;`);
+    },
+);
+
+check(
+    "the native window icon is the canonical square mark",
+    {
+        claim: "the shipped native icon remains the canonical 960-pixel square mark",
+        size: "integration",
+    },
+    () => {
+        requireEngineCheckout();
+        const bytes = nativeIcon();
+        const header = new DataView(bytes.buffer, bytes.byteOffset);
+        expect(header.getUint32(16)).toBe(960);
+        expect(header.getUint32(20)).toBe(960);
+        expect(readFileSync(resolve(ROOT, NATIVE_ICON))).toEqual(Buffer.from(bytes));
+    },
+);

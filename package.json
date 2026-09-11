@@ -1,5 +1,6 @@
 {
     "name": "shallot-site",
+    "version": "0.9.5",
     "private": true,
     "type": "module",
     "scripts": {
@@ -7,14 +8,18 @@
         "build": "bun run scripts/build-site.ts",
         "pages": "bun run scripts/build-pages.ts",
         "demos": "bun run scripts/demos.ts",
-        "check": "tsc --noEmit && biome check && bun run scripts/check-site.ts",
-        "test": "bun test src scripts"
+        "list": "shallot list",
+        "workflow": "shallot workflow",
+        "check": "tsc --noEmit && biome check && shallot check",
+        "test": "shallot test",
+        "test:integration": "shallot test:integration"
     },
     "dependencies": {
         "@dylanebert/shallot": "0.9.5"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.5.13",
+        "@dylanebert/shallot": "github:dylanebert/shallot#1ad4d7a500c13b4a3c0422a3b09584834d5e626d",
         "@types/bun": "latest",
         "typescript": "^7.0.2"
     }

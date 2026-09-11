@@ -1,0 +1,11 @@
+{
+    "$schema": "https://raw.githubusercontent.com/dylanebert/shallot/main/shallot.schema.json",
+    "check": [
+        { "file": "scripts/brand-assets.test.ts" },
+        { "file": "scripts/build-site.test.ts" },
+        { "file": "scripts/check-site.test.ts" },
+        { "file": "src/rum-compile-vitals.test.ts" },
+        { "file": "src/rum-loaf.test.ts" },
+        { "file": "src/rum-sampler.test.ts" }
+    ]
+}

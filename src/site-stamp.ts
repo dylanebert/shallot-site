@@ -217,7 +217,12 @@ export interface StaleDemo {
 
 /** The demos present in `outDirPath` whose artifact is not a build of `rootDir`'s current
  * sources. An absent demo dir is not stale — a `--demo` filtered build only writes some slots. */
-export function staleDemos(rootDir: string, outDirPath: string, slugs: string[]): StaleDemo[] {
+export function staleDemos(
+    rootDir: string,
+    outDirPath: string,
+    slugs: string[],
+    builderRoot: string = rootDir,
+): StaleDemo[] {
     const present = slugs.filter((slug) => existsSync(resolve(outDirPath, slug)));
     if (present.length === 0) return [];
     const stamp = readStamp(outDirPath);
@@ -230,7 +235,7 @@ export function staleDemos(rootDir: string, outDirPath: string, slugs: string[])
     // demos built from a release tag were never this tree's sources; the tag is immutable, so the
     // artifact cannot go stale against it
     if (stamp.mode.kind === "prod" && stamp.mode.tag) return [];
-    const current = demoFingerprints(rootDir, present);
+    const current = demoFingerprints(rootDir, present, builderRoot);
     const stale: StaleDemo[] = [];
     for (const slug of present) {
         const built = stamp.demos[slug];
