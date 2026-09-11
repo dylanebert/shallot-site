@@ -80,6 +80,10 @@ function fail(msg: string): never {
     process.exit(1);
 }
 
+if (!existsSync(showcaseDir) || ROSTER.length === 0) {
+    fail("✗ refused site artifact check: missing .engine checkout or empty showcase roster");
+}
+
 // --- clause 1: every entry's dir has a manifest -------------------------------------------
 
 const noManifest: string[] = [];
@@ -204,6 +208,7 @@ const stale = staleDemos(
     engineRoot,
     outDir,
     ROSTER.map((d) => d.slug),
+    root,
 );
 if (stale.length > 0) {
     if (process.env.SITE_OUT_REQUIRED === "1") {

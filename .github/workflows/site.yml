@@ -38,6 +38,9 @@ jobs:
 
       - run: bun run build
 
+      # Native carrier gates must pass before the artifact reaches the Pages publish step.
+      - run: bun run check
+      - run: bun run test
       - run: bun run scripts/check-site.ts
 
       - uses: actions/upload-artifact@v4

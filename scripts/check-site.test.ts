@@ -21,11 +21,13 @@
 // before the stamp existed) is the founding artifact itself: exit 0 with a stale-refusal note by
 // default, exit 1 naming staleness under `SITE_OUT_REQUIRED=1`.
 
-import { expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { expect } from "bun:test";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { check } from "@dylanebert/shallot/harness/check";
 import { ROSTER } from "../src/roster";
+import { datadogInitSnippet } from "../src/rum-config";
 import {
     demoFingerprints,
     readStamp,
@@ -33,10 +35,25 @@ import {
     staleDemos,
     writeStamp,
 } from "../src/site-stamp";
-import { datadogInitSnippet, nonWorkspaceShallotDependencies } from "./build-site";
+import { nonWorkspaceShallotDependencies } from "./build-site-logic";
 
 const repoRoot = resolve(import.meta.dir, "..");
 const checkSite = resolve(repoRoot, "scripts/check-site.ts");
+const engineRoot = resolve(repoRoot, ".engine");
+
+function requireSiteBuildPremise(): void {
+    const required = [
+        resolve(engineRoot, ".git"),
+        resolve(engineRoot, "examples/showcase"),
+        resolve(engineRoot, "package.json"),
+    ];
+    const missing = required.filter((path) => !existsSync(path));
+    if (missing.length > 0) {
+        throw new Error(
+            `refused artifact check: missing engine/build premise (${missing.join(", ")}); run bun run engine and bun run build`,
+        );
+    }
+}
 
 // the real repo's release version — the fixtures below stamp `prod` mode with it so clause 2's
 // mode-branched pin check (new in the staging build mode) reads a matching version rather than
@@ -49,21 +66,25 @@ const releaseVersion = (
 const PROD_MODE: SiteMode = { kind: "prod", version: releaseVersion };
 const STAGING_MODE: SiteMode = { kind: "staging", pin: "file:/tmp/dylanebert-shallot-0.0.0.tgz" };
 
-test("check-site clause 2 — rejects a fixed workspace extension version", () => {
-    expect(
-        nonWorkspaceShallotDependencies({
-            dependencies: {
-                "@dylanebert/shallot": "workspace:*",
-                "@dylanebert/shallot-wave": "0.1.0",
-            },
-        }),
-    ).toEqual([["@dylanebert/shallot-wave", "0.1.0"]]);
-    expect(
-        nonWorkspaceShallotDependencies({
-            dependencies: { "@dylanebert/shallot-wave": "workspace:*" },
-        }),
-    ).toEqual([]);
-});
+check(
+    "check-site clause 2 — rejects a fixed workspace extension version",
+    { claim: "check-site clause 2 — rejects a fixed workspace extension version" },
+    () => {
+        expect(
+            nonWorkspaceShallotDependencies({
+                dependencies: {
+                    "@dylanebert/shallot": "workspace:*",
+                    "@dylanebert/shallot-wave": "0.1.0",
+                },
+            }),
+        ).toEqual([["@dylanebert/shallot-wave", "0.1.0"]]);
+        expect(
+            nonWorkspaceShallotDependencies({
+                dependencies: { "@dylanebert/shallot-wave": "workspace:*" },
+            }),
+        ).toEqual([]);
+    },
+);
 
 /** A built-site fixture that clears clauses 4 and 5 and fails clause 6 — every demo root page
  * carries the pre-fix scratch-shaped <title> the site build used to synthesize. */
@@ -105,55 +126,83 @@ function runCheck(outDir: string, env: Record<string, string> = {}) {
     };
 }
 
-test("check-site — an unstamped built artifact refuses as stale, not as a title defect", () => {
-    const fixture = preFixFixture();
-    try {
-        const { exitCode, out } = runCheck(fixture);
-        expect(out).toContain("stale");
-        expect(out).not.toContain("non-human-readable");
-        expect(exitCode).toBe(0);
-    } finally {
-        rmSync(fixture, { recursive: true, force: true });
-    }
-});
+check(
+    "check-site — an unstamped built artifact refuses as stale, not as a title defect",
+    {
+        claim: "check-site — an unstamped built artifact refuses as stale, not as a title defect",
+        size: "integration",
+        subject: "engine.json",
+    },
+    () => {
+        requireSiteBuildPremise();
+        const fixture = preFixFixture();
+        try {
+            const { exitCode, out } = runCheck(fixture);
+            expect(out).toContain("stale");
+            expect(out).not.toContain("non-human-readable");
+            expect(exitCode).toBe(0);
+        } finally {
+            rmSync(fixture, { recursive: true, force: true });
+        }
+    },
+);
 
-test("check-site — a stale artifact on the deploy path reds on staleness, not on the title", () => {
-    const fixture = preFixFixture();
-    try {
-        // a stamp naming fingerprints that are not this tree's — the artifact is a build of some
-        // other sources, which is exactly the founding defect's state
-        writeStamp(
-            fixture,
-            Object.fromEntries(ROSTER.map(({ slug }) => [slug, "0".repeat(32)])),
-            PROD_MODE,
-        );
-        const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
-        expect(out).toContain("stale");
-        expect(out).not.toContain("non-human-readable");
-        expect(exitCode).toBe(1);
-    } finally {
-        rmSync(fixture, { recursive: true, force: true });
-    }
-});
+check(
+    "check-site — a stale artifact on the deploy path reds on staleness, not on the title",
+    {
+        claim: "check-site — a stale artifact on the deploy path reds on staleness, not on the title",
+        size: "integration",
+        subject: "engine.json",
+    },
+    () => {
+        requireSiteBuildPremise();
+        const fixture = preFixFixture();
+        try {
+            // a stamp naming fingerprints that are not this tree's — the artifact is a build of some
+            // other sources, which is exactly the founding defect's state
+            writeStamp(
+                fixture,
+                Object.fromEntries(ROSTER.map(({ slug }) => [slug, "0".repeat(32)])),
+                PROD_MODE,
+            );
+            const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
+            expect(out).toContain("stale");
+            expect(out).not.toContain("non-human-readable");
+            expect(exitCode).toBe(1);
+        } finally {
+            rmSync(fixture, { recursive: true, force: true });
+        }
+    },
+);
 
-test("check-site — a fresh artifact is judged: clause 6 reds on the pre-fix title", () => {
-    const fixture = preFixFixture();
-    try {
-        writeStamp(
-            fixture,
-            demoFingerprints(
-                repoRoot,
-                ROSTER.map((d) => d.slug),
-            ),
-            PROD_MODE,
-        );
-        const { exitCode, out } = runCheck(fixture);
-        expect(out).toContain("non-human-readable");
-        expect(exitCode).toBe(1);
-    } finally {
-        rmSync(fixture, { recursive: true, force: true });
-    }
-});
+check(
+    "check-site — a fresh artifact is judged: clause 6 reds on the pre-fix title",
+    {
+        claim: "check-site — a fresh artifact is judged: clause 6 reds on the pre-fix title",
+        size: "integration",
+        subject: "engine.json",
+    },
+    () => {
+        requireSiteBuildPremise();
+        const fixture = preFixFixture();
+        try {
+            writeStamp(
+                fixture,
+                demoFingerprints(
+                    engineRoot,
+                    ROSTER.map((d) => d.slug),
+                    repoRoot,
+                ),
+                PROD_MODE,
+            );
+            const { exitCode, out } = runCheck(fixture);
+            expect(out).toContain("non-human-readable");
+            expect(exitCode).toBe(1);
+        } finally {
+            rmSync(fixture, { recursive: true, force: true });
+        }
+    },
+);
 
 // --- the fingerprint's own moves, over a hermetic git tree -------------------------------
 //
@@ -186,87 +235,114 @@ function fixtureRepo(): string {
     return dir;
 }
 
-test("site-stamp — the fingerprint moves on a demo source, a builder, and the release version", () => {
-    const dir = fixtureRepo();
-    try {
-        const fp = () => demoFingerprints(dir, ["demo"]).demo;
-        const base = fp();
+check(
+    "site-stamp — the fingerprint moves on a demo source, a builder, and the release version",
+    {
+        claim: "site-stamp — the fingerprint moves on a demo source, a builder, and the release version",
+        size: "integration",
+        subject: "engine.json",
+    },
+    () => {
+        requireSiteBuildPremise();
+        const dir = fixtureRepo();
+        try {
+            const fp = () => demoFingerprints(dir, ["demo"]).demo;
+            const base = fp();
 
-        // the demo's own tracked source
-        writeFileSync(resolve(dir, "examples/showcase/demo/index.html"), "<html> </html>\n");
-        const afterDemo = fp();
-        expect(afterDemo).not.toBe(base);
-        writeFileSync(resolve(dir, "examples/showcase/demo/index.html"), "<html></html>\n");
-        expect(fp()).toBe(base);
+            // the demo's own tracked source
+            writeFileSync(resolve(dir, "examples/showcase/demo/index.html"), "<html> </html>\n");
+            const afterDemo = fp();
+            expect(afterDemo).not.toBe(base);
+            writeFileSync(resolve(dir, "examples/showcase/demo/index.html"), "<html></html>\n");
+            expect(fp()).toBe(base);
 
-        // a builder file no showcase dir contains — the founding defect's own shape (`bf1c25f`
-        // was a build-site.ts change, with every showcase file untouched)
-        writeFileSync(resolve(dir, "scripts/build-site.ts"), "// builder v2\n");
-        expect(fp()).not.toBe(base);
-        writeFileSync(resolve(dir, "scripts/build-site.ts"), "// builder\n");
+            // a builder file no showcase dir contains — the founding defect's own shape (`bf1c25f`
+            // was a build-site.ts change, with every showcase file untouched)
+            writeFileSync(resolve(dir, "scripts/build-site.ts"), "// builder v2\n");
+            expect(fp()).not.toBe(base);
+            writeFileSync(resolve(dir, "scripts/build-site.ts"), "// builder\n");
 
-        // source from the workspace extension packed for this demo
-        writeFileSync(
-            resolve(dir, "packages/shallot-wave/src/index.ts"),
-            "export const wave = 2;\n",
-        );
-        expect(fp()).not.toBe(base);
-        writeFileSync(
-            resolve(dir, "packages/shallot-wave/src/index.ts"),
-            "export const wave = 1;\n",
-        );
-        expect(fp()).toBe(base);
+            // source from the workspace extension packed for this demo
+            writeFileSync(
+                resolve(dir, "packages/shallot-wave/src/index.ts"),
+                "export const wave = 2;\n",
+            );
+            expect(fp()).not.toBe(base);
+            writeFileSync(
+                resolve(dir, "packages/shallot-wave/src/index.ts"),
+                "export const wave = 1;\n",
+            );
+            expect(fp()).toBe(base);
 
-        // the release version the ejected package.json is pinned to
-        writeFileSync(resolve(dir, "package.json"), `{"version":"0.2.0"}\n`);
-        expect(fp()).not.toBe(base);
-        writeFileSync(resolve(dir, "package.json"), `{"version":"0.1.0"}\n`);
-        expect(fp()).toBe(base);
+            // the release version the ejected package.json is pinned to
+            writeFileSync(resolve(dir, "package.json"), `{"version":"0.2.0"}\n`);
+            expect(fp()).not.toBe(base);
+            writeFileSync(resolve(dir, "package.json"), `{"version":"0.1.0"}\n`);
+            expect(fp()).toBe(base);
 
-        // untracked residue is out of scope — a `dist/` build leftover must not move the
-        // fingerprint, or the relation would depend on which checkout computed it
-        mkdirSync(resolve(dir, "examples/showcase/demo/dist"), { recursive: true });
-        writeFileSync(resolve(dir, "examples/showcase/demo/dist/index.html"), "built\n");
-        expect(fp()).toBe(base);
-    } finally {
-        rmSync(dir, { recursive: true, force: true });
-    }
-});
+            // untracked residue is out of scope — a `dist/` build leftover must not move the
+            // fingerprint, or the relation would depend on which checkout computed it
+            mkdirSync(resolve(dir, "examples/showcase/demo/dist"), { recursive: true });
+            writeFileSync(resolve(dir, "examples/showcase/demo/dist/index.html"), "built\n");
+            expect(fp()).toBe(base);
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    },
+);
 
-test("site-stamp — staleness is per demo dir, and an absent dir is not stale", () => {
-    const dir = fixtureRepo();
-    const out = mkdtempSync(join(tmpdir(), "site-stamp-out-"));
-    try {
-        // no demo dir built at all: nothing to judge, nothing stale (an unbuilt slot is clause
-        // 4's own skip, not a staleness claim)
-        expect(staleDemos(dir, out, ["demo"])).toEqual([]);
+check(
+    "site-stamp — staleness is per demo dir, and an absent dir is not stale",
+    {
+        claim: "site-stamp — staleness is per demo dir, and an absent dir is not stale",
+        size: "integration",
+        subject: "engine.json",
+    },
+    () => {
+        requireSiteBuildPremise();
+        const dir = fixtureRepo();
+        const out = mkdtempSync(join(tmpdir(), "site-stamp-out-"));
+        try {
+            // no demo dir built at all: nothing to judge, nothing stale (an unbuilt slot is clause
+            // 4's own skip, not a staleness claim)
+            expect(staleDemos(dir, out, ["demo"])).toEqual([]);
 
-        mkdirSync(resolve(out, "demo"), { recursive: true });
-        // present but unstamped
-        expect(staleDemos(dir, out, ["demo"]).map((s) => s.slug)).toEqual(["demo"]);
+            mkdirSync(resolve(out, "demo"), { recursive: true });
+            // present but unstamped
+            expect(staleDemos(dir, out, ["demo"]).map((s) => s.slug)).toEqual(["demo"]);
 
-        writeStamp(out, demoFingerprints(dir, ["demo"]), PROD_MODE);
-        expect(staleDemos(dir, out, ["demo"])).toEqual([]);
+            writeStamp(out, demoFingerprints(dir, ["demo"]), PROD_MODE);
+            expect(staleDemos(dir, out, ["demo"])).toEqual([]);
 
-        // sources move under a stamped artifact
-        writeFileSync(resolve(dir, "examples/showcase/demo/index.html"), "<html> </html>\n");
-        expect(staleDemos(dir, out, ["demo"]).map((s) => s.slug)).toEqual(["demo"]);
-    } finally {
-        rmSync(dir, { recursive: true, force: true });
-        rmSync(out, { recursive: true, force: true });
-    }
-});
+            // sources move under a stamped artifact
+            writeFileSync(resolve(dir, "examples/showcase/demo/index.html"), "<html> </html>\n");
+            expect(staleDemos(dir, out, ["demo"]).map((s) => s.slug)).toEqual(["demo"]);
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+            rmSync(out, { recursive: true, force: true });
+        }
+    },
+);
 
-test("site-stamp — a stamp write merges over a prior build's other slots", () => {
-    const out = mkdtempSync(join(tmpdir(), "site-stamp-merge-"));
-    try {
-        writeStamp(out, { a: "aaa", b: "bbb" }, PROD_MODE);
-        writeStamp(out, { b: "ccc" }, PROD_MODE); // a `--demo b` rebuild
-        expect(readStamp(out)?.demos).toEqual({ a: "aaa", b: "ccc" });
-    } finally {
-        rmSync(out, { recursive: true, force: true });
-    }
-});
+check(
+    "site-stamp — a stamp write merges over a prior build's other slots",
+    {
+        claim: "site-stamp — a stamp write merges over a prior build's other slots",
+        size: "integration",
+        subject: "engine.json",
+    },
+    () => {
+        requireSiteBuildPremise();
+        const out = mkdtempSync(join(tmpdir(), "site-stamp-merge-"));
+        try {
+            writeStamp(out, { a: "aaa", b: "bbb" }, PROD_MODE);
+            writeStamp(out, { b: "ccc" }, PROD_MODE); // a `--demo b` rebuild
+            expect(readStamp(out)?.demos).toEqual({ a: "aaa", b: "ccc" });
+        } finally {
+            rmSync(out, { recursive: true, force: true });
+        }
+    },
+);
 
 // --- S1 (staging build mode): the stamp's mode branches clause 2's pin check and clause 5's
 // env check two-sided ------------------------------------------------------------------------
@@ -304,71 +380,116 @@ function stampFresh(fixture: string, mode: SiteMode) {
     writeStamp(
         fixture,
         demoFingerprints(
-            repoRoot,
+            engineRoot,
             ROSTER.map((d) => d.slug),
+            repoRoot,
         ),
         mode,
     );
 }
 
-test("check-site — a staging artifact stamped staging passes clean", () => {
-    const fixture = modeFixture("staging");
-    try {
-        stampFresh(fixture, STAGING_MODE);
-        const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
-        expect(exitCode).toBe(0);
-        expect(out).toContain("✓");
-    } finally {
-        rmSync(fixture, { recursive: true, force: true });
-    }
-});
+check(
+    "check-site — a staging artifact stamped staging passes clean",
+    {
+        claim: "check-site — a staging artifact stamped staging passes clean",
+        size: "integration",
+        subject: "engine.json",
+    },
+    () => {
+        requireSiteBuildPremise();
+        const fixture = modeFixture("staging");
+        try {
+            stampFresh(fixture, STAGING_MODE);
+            const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
+            expect(exitCode).toBe(0);
+            expect(out).toContain("✓");
+        } finally {
+            rmSync(fixture, { recursive: true, force: true });
+        }
+    },
+);
 
-test("check-site — a prod artifact stamped prod passes clean", () => {
-    const fixture = modeFixture("prod");
-    try {
-        stampFresh(fixture, PROD_MODE);
-        const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
-        expect(exitCode).toBe(0);
-        expect(out).toContain("✓");
-    } finally {
-        rmSync(fixture, { recursive: true, force: true });
-    }
-});
+check(
+    "check-site — a prod artifact stamped prod passes clean",
+    {
+        claim: "check-site — a prod artifact stamped prod passes clean",
+        size: "integration",
+        subject: "engine.json",
+    },
+    () => {
+        requireSiteBuildPremise();
+        const fixture = modeFixture("prod");
+        try {
+            stampFresh(fixture, PROD_MODE);
+            const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
+            expect(exitCode).toBe(0);
+            expect(out).toContain("✓");
+        } finally {
+            rmSync(fixture, { recursive: true, force: true });
+        }
+    },
+);
 
 // The two-sided mutation check the spec's Validation names directly: a staging artifact judged
 // with the prod clause set must red, and vice versa — never pass on the union of both literals.
-test("check-site — a staging artifact judged with the prod clause set reds", () => {
-    const fixture = modeFixture("staging");
-    try {
-        stampFresh(fixture, PROD_MODE); // wrong clause set: mode says prod, content is staging
-        const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
-        expect(exitCode).toBe(1);
-        expect(out).toContain("missing the RUM env-derivation snippet for prod mode");
-    } finally {
-        rmSync(fixture, { recursive: true, force: true });
-    }
-});
+check(
+    "check-site — a staging artifact judged with the prod clause set reds",
+    {
+        claim: "check-site — a staging artifact judged with the prod clause set reds",
+        size: "integration",
+        subject: "engine.json",
+    },
+    () => {
+        requireSiteBuildPremise();
+        const fixture = modeFixture("staging");
+        try {
+            stampFresh(fixture, PROD_MODE); // wrong clause set: mode says prod, content is staging
+            const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
+            expect(exitCode).toBe(1);
+            expect(out).toContain("missing the RUM env-derivation snippet for prod mode");
+        } finally {
+            rmSync(fixture, { recursive: true, force: true });
+        }
+    },
+);
 
-test("check-site — a prod artifact judged with the staging clause set reds", () => {
-    const fixture = modeFixture("prod");
-    try {
-        stampFresh(fixture, STAGING_MODE); // wrong clause set: mode says staging, content is prod
-        const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
-        expect(exitCode).toBe(1);
-        expect(out).toContain("missing the RUM env-derivation snippet for staging mode");
-    } finally {
-        rmSync(fixture, { recursive: true, force: true });
-    }
-});
+check(
+    "check-site — a prod artifact judged with the staging clause set reds",
+    {
+        claim: "check-site — a prod artifact judged with the staging clause set reds",
+        size: "integration",
+        subject: "engine.json",
+    },
+    () => {
+        requireSiteBuildPremise();
+        const fixture = modeFixture("prod");
+        try {
+            stampFresh(fixture, STAGING_MODE); // wrong clause set: mode says staging, content is prod
+            const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
+            expect(exitCode).toBe(1);
+            expect(out).toContain("missing the RUM env-derivation snippet for staging mode");
+        } finally {
+            rmSync(fixture, { recursive: true, force: true });
+        }
+    },
+);
 
-test("check-site — a page carrying both mode's env literals reds on the two-sided check", () => {
-    const out = mkdtempSync(join(tmpdir(), "check-site-fixture-bothmodes-"));
-    try {
-        for (const { slug } of ROSTER) {
-            mkdirSync(resolve(out, slug), { recursive: true });
-            writeFileSync(
-                resolve(out, slug, "index.html"),
-                `<!doctype html>
+check(
+    "check-site — a page carrying both mode's env literals reds on the two-sided check",
+    {
+        claim: "check-site — a page carrying both mode's env literals reds on the two-sided check",
+        size: "integration",
+        subject: "engine.json",
+    },
+    () => {
+        requireSiteBuildPremise();
+        const out = mkdtempSync(join(tmpdir(), "check-site-fixture-bothmodes-"));
+        try {
+            for (const { slug } of ROSTER) {
+                mkdirSync(resolve(out, slug), { recursive: true });
+                writeFileSync(
+                    resolve(out, slug, "index.html"),
+                    `<!doctype html>
 <html lang="en">
     <head>
         <title>${slug}</title>
@@ -380,43 +501,62 @@ ${datadogInitSnippet("prod")}    <!-- var ddEnv='staging'; -->
     </body>
 </html>
 `,
+                );
+            }
+            writeFileSync(
+                resolve(out, "index.html"),
+                `<!doctype html>\n<html><body>${datadogInitSnippet()}</body></html>\n`,
             );
+            stampFresh(out, PROD_MODE);
+            const { exitCode, out: log } = runCheck(out, { SITE_OUT_REQUIRED: "1" });
+            expect(exitCode).toBe(1);
+            expect(log).toContain("carry the other mode's env");
+        } finally {
+            rmSync(out, { recursive: true, force: true });
         }
-        writeFileSync(
-            resolve(out, "index.html"),
-            `<!doctype html>\n<html><body>${datadogInitSnippet()}</body></html>\n`,
-        );
-        stampFresh(out, PROD_MODE);
-        const { exitCode, out: log } = runCheck(out, { SITE_OUT_REQUIRED: "1" });
-        expect(exitCode).toBe(1);
-        expect(log).toContain("carry the other mode's env");
-    } finally {
-        rmSync(out, { recursive: true, force: true });
-    }
-});
+    },
+);
 
-test("check-site — clause 2's artifact leg: a prod stamp naming a stale version reds", () => {
-    const fixture = modeFixture("prod");
-    try {
-        stampFresh(fixture, { kind: "prod", version: "0.0.0-not-the-real-version" });
-        const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
-        expect(exitCode).toBe(1);
-        expect(out).toContain(
-            "build stamp records prod mode pinned to v0.0.0-not-the-real-version",
-        );
-    } finally {
-        rmSync(fixture, { recursive: true, force: true });
-    }
-});
+check(
+    "check-site — clause 2's artifact leg: a prod stamp naming a stale version reds",
+    {
+        claim: "check-site — clause 2's artifact leg: a prod stamp naming a stale version reds",
+        size: "integration",
+        subject: "engine.json",
+    },
+    () => {
+        requireSiteBuildPremise();
+        const fixture = modeFixture("prod");
+        try {
+            stampFresh(fixture, { kind: "prod", version: "0.0.0-not-the-real-version" });
+            const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
+            expect(exitCode).toBe(1);
+            expect(out).toContain(
+                "build stamp records prod mode pinned to v0.0.0-not-the-real-version",
+            );
+        } finally {
+            rmSync(fixture, { recursive: true, force: true });
+        }
+    },
+);
 
-test("check-site — clause 2's artifact leg: a staging stamp naming a non-tarball pin reds", () => {
-    const fixture = modeFixture("staging");
-    try {
-        stampFresh(fixture, { kind: "staging", pin: "not-a-file-pin" });
-        const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
-        expect(exitCode).toBe(1);
-        expect(out).toContain('build stamp records staging mode with pin "not-a-file-pin"');
-    } finally {
-        rmSync(fixture, { recursive: true, force: true });
-    }
-});
+check(
+    "check-site — clause 2's artifact leg: a staging stamp naming a non-tarball pin reds",
+    {
+        claim: "check-site — clause 2's artifact leg: a staging stamp naming a non-tarball pin reds",
+        size: "integration",
+        subject: "engine.json",
+    },
+    () => {
+        requireSiteBuildPremise();
+        const fixture = modeFixture("staging");
+        try {
+            stampFresh(fixture, { kind: "staging", pin: "not-a-file-pin" });
+            const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
+            expect(exitCode).toBe(1);
+            expect(out).toContain('build stamp records staging mode with pin "not-a-file-pin"');
+        } finally {
+            rmSync(fixture, { recursive: true, force: true });
+        }
+    },
+);
