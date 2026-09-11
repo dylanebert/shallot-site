@@ -7,17 +7,11 @@ import { expect } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { check } from "@dylanebert/shallot/harness/check";
-import {
-    icon,
-    iconTargets,
-    NATIVE_ICON,
-    nativeIcon,
-    ROOT,
-    SCAFFOLD,
-    scaffoldSource,
-} from "./brand-assets";
+import { decodePng } from "../src/brand/png";
+import { icon, iconTargets, nativeIcon, ROOT, SCAFFOLD, scaffoldSource } from "./brand-assets";
 
 const engine = ROOT;
+const CANONICAL_LOGO = "assets/logo-1024.png";
 
 function requireEngineCheckout(): void {
     const required = [
@@ -25,6 +19,7 @@ function requireEngineCheckout(): void {
         resolve(engine, "examples/showcase"),
         resolve(engine, "packages/create-shallot/index.ts"),
         resolve(engine, "packages/shallot/assets/icon-1024.png"),
+        resolve(engine, CANONICAL_LOGO),
     ];
     const missing = required.filter((path) => !existsSync(path));
     if (missing.length > 0) {
@@ -101,10 +96,30 @@ check(
     },
     () => {
         requireEngineCheckout();
-        const bytes = nativeIcon();
-        const header = new DataView(bytes.buffer, bytes.byteOffset);
-        expect(header.getUint32(16)).toBe(960);
-        expect(header.getUint32(20)).toBe(960);
-        expect(readFileSync(resolve(ROOT, NATIVE_ICON))).toEqual(Buffer.from(bytes));
+        const native = decodePng(nativeIcon());
+        const canonicalLogo = decodePng(readFileSync(resolve(engine, CANONICAL_LOGO)));
+        expect(native.width).toBe(960);
+        expect(native.height).toBe(960);
+        expect(canonicalLogo.height).toBe(960);
+        expect(canonicalLogo.width).toBeGreaterThanOrEqual(native.width);
+
+        // The engine's rendered logo is an independent canonical raster. The logo generator
+        // places its wordmark at x=70 in the 80-unit viewBox, so the first 840 rendered columns
+        // are the icon and gap; the native 960-square canvas is transparent for the remainder.
+        // Compare decoded RGBA pixels, not PNG bytes or only dimensions.
+        const canonical = new Uint8Array(native.width * native.height * 4);
+        const canonicalLogoStride = canonicalLogo.width * 4;
+        const nativeStride = native.width * 4;
+        const markColumns = 70 * 12;
+        for (let y = 0; y < native.height; y++) {
+            canonical.set(
+                canonicalLogo.pixels.subarray(
+                    y * canonicalLogoStride,
+                    y * canonicalLogoStride + markColumns * 4,
+                ),
+                y * nativeStride,
+            );
+        }
+        expect(Buffer.from(native.pixels)).toEqual(Buffer.from(canonical));
     },
 );

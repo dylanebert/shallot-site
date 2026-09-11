@@ -1,4 +1,4 @@
-import { deflateSync } from "node:zlib";
+import { deflateSync, inflateSync } from "node:zlib";
 import type { Grid, Palette } from "./mark";
 
 // Minimal PNG writer for pixel-art exports: 8-bit RGBA, no filtering, one IDAT. Enough for a
@@ -31,6 +31,99 @@ function chunk(type: string, data: Uint8Array): Uint8Array {
     out.set(data, 8);
     view.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
     return out;
+}
+
+export type DecodedPng = {
+    width: number;
+    height: number;
+    pixels: Uint8Array;
+};
+
+const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+
+/** Decode the 8-bit RGBA PNGs used by the engine's canonical brand assets. */
+export function decodePng(bytes: Uint8Array): DecodedPng {
+    if (!bytes.subarray(0, PNG_SIGNATURE.length).every((byte, i) => byte === PNG_SIGNATURE[i])) {
+        throw new Error("brand PNG: invalid signature");
+    }
+
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let offset = PNG_SIGNATURE.length;
+    let width = 0;
+    let height = 0;
+    let bitDepth = 0;
+    let colorType = 0;
+    let interlace = 0;
+    const idat: Uint8Array[] = [];
+    while (offset < bytes.byteLength) {
+        if (offset + 12 > bytes.byteLength) throw new Error("brand PNG: truncated chunk");
+        const length = view.getUint32(offset);
+        const type = String.fromCharCode(...bytes.subarray(offset + 4, offset + 8));
+        const dataStart = offset + 8;
+        const dataEnd = dataStart + length;
+        if (dataEnd + 4 > bytes.byteLength) throw new Error(`brand PNG: truncated ${type}`);
+        if (type === "IHDR") {
+            if (length !== 13) throw new Error("brand PNG: invalid IHDR");
+            width = view.getUint32(dataStart);
+            height = view.getUint32(dataStart + 4);
+            bitDepth = bytes[dataStart + 8] as number;
+            colorType = bytes[dataStart + 9] as number;
+            interlace = bytes[dataStart + 12] as number;
+        } else if (type === "IDAT") {
+            idat.push(bytes.slice(dataStart, dataEnd));
+        } else if (type === "IEND") {
+            break;
+        }
+        offset = dataEnd + 4;
+    }
+    if (!width || !height || bitDepth !== 8 || colorType !== 6 || interlace !== 0) {
+        throw new Error("brand PNG: expected a non-interlaced 8-bit RGBA image");
+    }
+    if (idat.length === 0) throw new Error("brand PNG: missing IDAT");
+
+    const stride = width * 4;
+    const filtered = new Uint8Array(
+        inflateSync(Buffer.concat(idat.map((chunk) => Buffer.from(chunk)))),
+    );
+    const expected = height * (stride + 1);
+    if (filtered.length !== expected) throw new Error("brand PNG: unexpected scanline length");
+    const pixels = new Uint8Array(width * height * 4);
+    const prior = new Uint8Array(stride);
+    for (let y = 0; y < height; y++) {
+        const rowStart = y * (stride + 1);
+        const filter = filtered[rowStart];
+        const row = filtered.subarray(rowStart + 1, rowStart + 1 + stride);
+        const decoded = pixels.subarray(y * stride, (y + 1) * stride);
+        for (let i = 0; i < stride; i++) {
+            const left = i >= 4 ? decoded[i - 4] : 0;
+            const up = prior[i] ?? 0;
+            const upperLeft = i >= 4 ? (prior[i - 4] ?? 0) : 0;
+            const predictor =
+                filter === 0
+                    ? 0
+                    : filter === 1
+                      ? left
+                      : filter === 2
+                        ? up
+                        : filter === 3
+                          ? Math.floor((left + up) / 2)
+                          : filter === 4
+                            ? paeth(left, up, upperLeft)
+                            : -1;
+            if (predictor < 0) throw new Error(`brand PNG: unsupported filter ${filter}`);
+            decoded[i] = (row[i] as number) + predictor;
+        }
+        prior.set(decoded);
+    }
+    return { width, height, pixels };
+}
+
+function paeth(left: number, up: number, upperLeft: number): number {
+    const p = left + up - upperLeft;
+    const pa = Math.abs(p - left);
+    const pb = Math.abs(p - up);
+    const pc = Math.abs(p - upperLeft);
+    return pa <= pb && pa <= pc ? left : pb <= pc ? up : upperLeft;
 }
 
 const hexToRgb = (hex: string): [number, number, number] => [
