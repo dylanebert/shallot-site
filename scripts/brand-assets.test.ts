@@ -50,6 +50,7 @@ check(
     {
         claim: "tracked default showcase icons remain structurally equal to the engine's rendered mark",
         size: "integration",
+        subject: "engine.json",
     },
     () => {
         requireEngineCheckout();
@@ -67,6 +68,7 @@ check(
     {
         claim: "a showcase-owned icon remains excluded from default brand regeneration",
         size: "integration",
+        subject: "engine.json",
     },
     () => {
         requireEngineCheckout();
@@ -81,6 +83,7 @@ check(
     {
         claim: "the create-shallot scaffold keeps its generated icon source internally stable",
         size: "integration",
+        subject: "engine.json",
     },
     () => {
         requireEngineCheckout();
@@ -94,6 +97,7 @@ check(
     {
         claim: "the shipped native icon remains the canonical 960-pixel square mark",
         size: "integration",
+        subject: "engine.json",
     },
     () => {
         requireEngineCheckout();
