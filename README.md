@@ -15,7 +15,7 @@ bun run list      # list the complete declared carrier population
 bun run workflow  # regenerate .github/workflows/test-surface.yml
 bun run check     # static/type checks and declared-surface drift
 bun run test      # bounded native unit checks
-bun run test:integration -- --base <ref> --diff <ref>  # selected artifact/brand checks
+bun run test -- --integration -- --base <ref> --diff <ref>  # selected artifact/brand checks
 bun run demos     # build, then `shallot verify` each demo page (needs a GPU and a display)
 ```
 
