@@ -67,8 +67,8 @@ const releaseVersion = (
 const PROD_MODE: SiteMode = { kind: "prod", version: releaseVersion };
 const STAGING_MODE: SiteMode = {
     kind: "staging",
-    pin: "github:dylanebert/shallot#70770cfc34d82fdd19cb705d8753bb6f093748d6",
-    commit: "70770cfc34d82fdd19cb705d8753bb6f093748d6",
+    pin: "github:dylanebert/shallot#0664218f465224397b80aeb604b51178ac71cfb2",
+    commit: "0664218f465224397b80aeb604b51178ac71cfb2",
 };
 
 check(

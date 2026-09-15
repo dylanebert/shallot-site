@@ -1,4 +1,4 @@
-import { DARK, fromBlocks, LIGHT, lockup, MARK, toSvg, word } from "./mark";
+import { DARK, fromBlocks, LIGHT, lockup, MARK, toSvg, word } from "@dylanebert/shallot/brand";
 import { AGENTS_LINK, CSS_PALETTE, FONTS, STYLE, THEME_SCRIPT, TOGGLE, top } from "./theme";
 
 // The brand page at /shallot/brand/: a back arrow to home, then the assets, shown plainly, and

@@ -4,12 +4,15 @@
 // showcase population, scaffold and native icon inputs.
 
 import { expect } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { deflateSync } from "node:zlib";
 import { check } from "@dylanebert/shallot/harness/check";
 import { decodePng } from "../src/brand/png";
+import { root } from "../src/engine";
 import { icon, iconTargets, nativeIcon, ROOT, SCAFFOLD, scaffoldSource } from "./brand-assets";
+import { buildBrand } from "./build-pages";
 
 const engine = ROOT;
 const CANDIDATE_LAYOUT = !existsSync(resolve(engine, "examples/showcase"));
@@ -325,6 +328,28 @@ function comparableSvg(source: string): string {
         .replace(/\n\s*\n/g, "\n")
         .trim();
 }
+
+check(
+    "the installed brand module owns the displayed source and the retired site fork is absent",
+    {
+        claim: "installed brand source owns production display and retired site fork is absent",
+    },
+    async () => {
+        const siteBrandFork = resolve(import.meta.dir, "../src/brand/mark.ts");
+        expect(existsSync(siteBrandFork)).toBe(false);
+
+        const output = mkdtempSync(join(tmpdir(), "shallot-brand-owner-"));
+        try {
+            await buildBrand(output);
+            const installedBrand = Bun.resolveSync("@dylanebert/shallot/brand", root);
+            expect(readFileSync(resolve(output, "brand/mark.ts"), "utf8")).toBe(
+                readFileSync(installedBrand, "utf8"),
+            );
+        } finally {
+            rmSync(output, { recursive: true, force: true });
+        }
+    },
+);
 
 check(
     "every default example icon is the rendered mark",

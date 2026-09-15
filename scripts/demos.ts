@@ -28,6 +28,12 @@ const outDir = resolve(root, "out/site");
 
 const CAPTURE_CONTRACT = "final-canvas 1280x720@1 rgba8-tight";
 
+/** A non-empty CHROME_PATH opts into an explicit browser; otherwise Playwright selects its managed Chromium. */
+export function chromeExecutablePath(value: string | undefined): string | undefined {
+    const path = value?.trim();
+    return path || undefined;
+}
+
 interface DemoOutcome {
     slug: string;
     result: "pass" | "fail" | "skip";
@@ -39,11 +45,10 @@ interface DemoOutcome {
  * The browser is closed in the same finally block that owns the verdict; no screenshot transport or
  * consumer-local frame reader survives here. */
 async function capture(htmlPath: string, captureScript: string): Promise<number> {
+    const executablePath = chromeExecutablePath(process.env.CHROME_PATH);
     const browser = await chromium.launch({
         headless: false,
-        executablePath:
-            process.env.CHROME_PATH ??
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        ...(executablePath ? { executablePath } : {}),
         args: ["--enable-unsafe-webgpu", "--allow-file-access-from-files"],
     });
     try {
@@ -173,7 +178,10 @@ seat or off-contract frame refuses; it is not green.
 
 Options:
   --demo <slug>   Build and capture a single demo by its roster slug
-  --candidate     Use the qualified full-SHA candidate for both build and capture`);
+  --candidate     Use the qualified full-SHA candidate for both build and capture
+
+Environment:
+  CHROME_PATH     Use a non-empty explicit browser path instead of managed Chromium`);
         process.exit(0);
     }
 

@@ -35,7 +35,7 @@ bun run scripts/check-site.ts
 ```
 
 The candidate is Shallot commit
-`70770cfc34d82fdd19cb705d8753bb6f093748d6`. The carrier dev dependency, engine
+`0664218f465224397b80aeb604b51178ac71cfb2`. The carrier dev dependency, engine
 checkout, ejected demo dependency and build stamp must agree on that full SHA.
 The stable release is deliberately separate from the candidate carrier: production
 writes `engine.json.release` into each ejected demo manifest and fresh install lock.

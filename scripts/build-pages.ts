@@ -10,7 +10,7 @@ import {
     toSvg,
     toText,
     word,
-} from "../src/brand/mark";
+} from "@dylanebert/shallot/brand";
 import { brandPage } from "../src/brand/page";
 import { toPng } from "../src/brand/png";
 import { engineRef, engineVersion, root } from "../src/engine";
@@ -74,7 +74,8 @@ export async function buildBrand(
     write("wordmark.svg", toSvg(word(), DARK, 1));
     write("wordmark.png", toPng(word(), DARK, 8));
     write("mark.txt", `${toText(toCells(mark))}\n`);
-    write("mark.ts", readFileSync(resolve(root, "src/brand/mark.ts"), "utf8"));
+    const brandModule = Bun.resolveSync("@dylanebert/shallot/brand", root);
+    write("mark.ts", readFileSync(brandModule, "utf8"));
 }
 
 /** Writes the home index, `llms.txt`, and the brand pages. `rumMode` picks the Datadog env
