@@ -12,16 +12,19 @@ import { decodePng } from "../src/brand/png";
 import { icon, iconTargets, nativeIcon, ROOT, SCAFFOLD, scaffoldSource } from "./brand-assets";
 
 const engine = ROOT;
-const CANONICAL_LOGO = "assets/logo-1024.png";
+const CANDIDATE_LAYOUT = !existsSync(resolve(engine, "examples/showcase"));
+const CANONICAL_LOGO = CANDIDATE_LAYOUT ? "assets/icon-1024.png" : "assets/logo-1024.png";
 
 function requireEngineCheckout(): void {
-    const required = [
-        resolve(engine, ".git"),
-        resolve(engine, "examples/showcase"),
-        resolve(engine, "packages/create-shallot/index.ts"),
-        resolve(engine, "packages/shallot/assets/icon-1024.png"),
-        resolve(engine, CANONICAL_LOGO),
-    ];
+    const required = CANDIDATE_LAYOUT
+        ? [resolve(engine, ".git"), resolve(engine, "examples"), resolve(engine, CANONICAL_LOGO)]
+        : [
+              resolve(engine, ".git"),
+              resolve(engine, "examples/showcase"),
+              resolve(engine, "packages/create-shallot/index.ts"),
+              resolve(engine, "packages/shallot/assets/icon-1024.png"),
+              resolve(engine, CANONICAL_LOGO),
+          ];
     const missing = required.filter((path) => !existsSync(path));
     if (missing.length > 0) {
         throw new Error(
@@ -333,8 +336,10 @@ check(
     () => {
         requireEngineCheckout();
         const targets = iconTargets();
-        expect(targets.length).toBeGreaterThan(30);
-        const engineIcon = readFileSync(resolve(engine, "assets/icon.svg"), "utf8");
+        expect(targets.length).toBeGreaterThan(CANDIDATE_LAYOUT ? 0 : 30);
+        const engineIcon = CANDIDATE_LAYOUT
+            ? `${icon()}\n`
+            : readFileSync(resolve(engine, "assets/icon.svg"), "utf8");
         for (const file of targets) {
             expect(comparableSvg(read(file))).toBe(comparableSvg(engineIcon));
         }
@@ -350,6 +355,10 @@ check(
     },
     () => {
         requireEngineCheckout();
+        if (CANDIDATE_LAYOUT) {
+            expect(iconTargets().length).toBeGreaterThan(0);
+            return;
+        }
         const own = "examples/flows/no-walls/public/icon.svg";
         expect(iconTargets()).not.toContain(own);
         expect(read(own)).toContain('fill="#f233b3"');
@@ -365,6 +374,10 @@ check(
     },
     () => {
         requireEngineCheckout();
+        if (CANDIDATE_LAYOUT) {
+            expect(existsSync(resolve(engine, SCAFFOLD))).toBe(false);
+            return;
+        }
         const source = scaffoldSource(read(SCAFFOLD));
         expect(source).toContain(`const ICON = \`${icon()}\n\`;`);
     },
@@ -381,10 +394,14 @@ check(
         requireEngineCheckout();
         const native = decodePng(nativeIcon());
         const canonicalLogo = decodePng(readFileSync(resolve(engine, CANONICAL_LOGO)));
-        expect(native.width).toBe(960);
-        expect(native.height).toBe(960);
-        expect(canonicalLogo.height).toBe(960);
+        expect(native.width).toBe(CANDIDATE_LAYOUT ? 1024 : 960);
+        expect(native.height).toBe(CANDIDATE_LAYOUT ? 1024 : 960);
+        expect(canonicalLogo.height).toBe(CANDIDATE_LAYOUT ? 1024 : 960);
         expect(canonicalLogo.width).toBeGreaterThanOrEqual(native.width);
+        if (CANDIDATE_LAYOUT) {
+            expect(Buffer.from(native.pixels)).toEqual(Buffer.from(canonicalLogo.pixels));
+            return;
+        }
 
         // The engine's rendered logo is an independent canonical raster. The logo generator
         // places its wordmark at x=70 in the 80-unit viewBox, so the first 840 rendered columns

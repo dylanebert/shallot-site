@@ -36,7 +36,7 @@ function deriveTitle(slug: string): string {
 // `scripts/check-docs.ts` wrote for its doc set. A `readdirSync` would read `dist/`,
 // `node_modules/`, and `test-results/` residue from a deleted project; asking git makes the
 // scope identical in every checkout.
-const prefix = "examples/showcase/";
+const prefix = existsSync(`${repoRoot}/examples/showcase`) ? "examples/showcase/" : "examples/";
 const tracked = existsSync(repoRoot)
     ? Bun.spawnSync(["git", "ls-files", "-z", prefix], { cwd: repoRoot })
     : null;

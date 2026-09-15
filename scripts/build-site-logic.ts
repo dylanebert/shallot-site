@@ -28,9 +28,8 @@ export function rewriteSiteDependencies(
     enginePin: string,
     extensionPins: ReadonlyMap<string, string>,
 ): DemoPackage {
-    const dependencies = pkg.dependencies;
-    if (!dependencies) return pkg;
-    if (dependencies["@dylanebert/shallot"]) dependencies["@dylanebert/shallot"] = enginePin;
+    const dependencies = (pkg.dependencies ??= {});
+    dependencies["@dylanebert/shallot"] = enginePin;
     for (const name of workspaceExtensionDependencies(pkg)) {
         const pin = extensionPins.get(name);
         if (!pin) throw new Error(`no packed tarball for workspace extension ${name}`);

@@ -45,19 +45,18 @@ export const STAMP_FILE = "build-stamp.json";
  * every demo's ejected `package.json` — recorded because the pin itself never survives to be read
  * back: each demo is ejected into a scratch tree under /tmp and that tree is deleted once the demo
  * is built, so `check-site.ts`'s clause 2 has nothing else to read the actual pin from. Prod
- * carries the release version it pinned; staging carries the `file:<tgz>` pin `bun pm pack`
- * produced, so a mode mix-up (prod artifact stamped staging, or vice versa) reds on the pin shape
- * instead of passing silently. */
+ * carries the release version it pinned; staging carries the full-SHA Git pin and checked-out
+ * commit, so a package/tag/demo mix-up reds on identity rather than passing silently. */
 export type SiteMode =
     | { kind: "prod"; version: string; tag?: string }
-    | { kind: "staging"; pin: string };
+    | { kind: "staging"; pin: string; commit: string };
 
 function isSiteMode(v: unknown): v is SiteMode {
     if (typeof v !== "object" || v === null) return false;
     const m = v as Record<string, unknown>;
     if (m.kind === "prod")
         return typeof m.version === "string" && (m.tag === undefined || typeof m.tag === "string");
-    if (m.kind === "staging") return typeof m.pin === "string";
+    if (m.kind === "staging") return typeof m.pin === "string" && typeof m.commit === "string";
     return false;
 }
 
@@ -65,7 +64,7 @@ export interface SiteStamp {
     /** Bumped when the fingerprint recipe below changes: an old stamp then reads stale, which is
      * the correct answer — a fingerprint computed by a different recipe is not comparable. Bumped
      * 1 → 2 to add `mode`; 2 → 3 to include tracked source from packed workspace extensions. */
-    recipe: 3;
+    recipe: 4;
     /** The mode this build ran in, and the engine pin it used — see `SiteMode` above. Overwritten
      * on every write (unlike `demos`, which merges) since a build run has exactly one mode. */
     mode: SiteMode;
@@ -73,7 +72,7 @@ export interface SiteStamp {
     demos: Record<string, string>;
 }
 
-const RECIPE: SiteStamp["recipe"] = 3;
+const RECIPE: SiteStamp["recipe"] = 4;
 
 /** The builder files whose contents reach every built page regardless of demo. */
 const BUILDER_FILES = [
@@ -84,7 +83,11 @@ const BUILDER_FILES = [
     "src/roster.ts",
 ];
 
-const SHOWCASE_PREFIX = "examples/showcase/";
+function examplesPrefix(rootDir: string): string {
+    const legacy = "examples/showcase/";
+    const probe = Bun.spawnSync(["git", "ls-files", "-z", legacy], { cwd: rootDir });
+    return probe.success && probe.stdout.toString().length > 0 ? legacy : "examples/";
+}
 
 function hashFile(hasher: Bun.CryptoHasher, rootDir: string, rel: string): void {
     const full = resolve(rootDir, rel);
@@ -105,7 +108,8 @@ function trackedFiles(rootDir: string, prefix: string): string[] {
 }
 
 function trackedShowcaseFiles(rootDir: string): Map<string, string[]> {
-    const tracked = Bun.spawnSync(["git", "ls-files", "-z", SHOWCASE_PREFIX], { cwd: rootDir });
+    const prefix = examplesPrefix(rootDir);
+    const tracked = Bun.spawnSync(["git", "ls-files", "-z", prefix], { cwd: rootDir });
     if (!tracked.success) {
         throw new Error(
             "`git ls-files` failed — the site build stamp needs a git checkout to scope each demo's sources.",
@@ -113,7 +117,7 @@ function trackedShowcaseFiles(rootDir: string): Map<string, string[]> {
     }
     const bySlug = new Map<string, string[]>();
     for (const path of tracked.stdout.toString().split("\0").filter(Boolean)) {
-        const parts = path.slice(SHOWCASE_PREFIX.length).split("/");
+        const parts = path.slice(prefix.length).split("/");
         if (parts.length < 2) continue; // a file directly in showcase/ belongs to no demo
         const slug = parts[0];
         const list = bySlug.get(slug);
@@ -151,7 +155,7 @@ export function demoFingerprints(
         hasher.update(`${sharedDigest}\0${slug}\0`);
         for (const rel of bySlug.get(slug) ?? []) hashFile(hasher, rootDir, rel);
 
-        const packagePath = resolve(rootDir, SHOWCASE_PREFIX, slug, "package.json");
+        const packagePath = resolve(rootDir, examplesPrefix(rootDir), slug, "package.json");
         const dependencies = existsSync(packagePath)
             ? ((
                   JSON.parse(readFileSync(packagePath, "utf8")) as {

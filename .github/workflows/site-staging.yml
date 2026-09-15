@@ -1,10 +1,6 @@
-# Staging site: the sibling of site.yml that ejects every showcase demo against a packed engine
-# checkout (`bun pm pack` + `file:<tgz>`) instead of the published npm package. It builds from
-# the tag `engine.json` pins, same as production; dispatch with `ref` to preview another engine
-# ref. Deploys to Cloudflare Pages.
-#
-# The deploy step is skipped while the Cloudflare secrets are unset. `secrets.*` cannot be read
-# inside an `if:` expression, so their presence is derived once into a job-level env var.
+# Candidate site proof: build every demo from the qualified Shallot full SHA and install that
+# same immutable Git identity in each ejected consumer. Deployment is optional and only admitted
+# when both Cloudflare credentials are present; local execution never deploys.
 
 name: site-staging
 
@@ -13,11 +9,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      ref:
-        description: Engine ref to build (defaults to the engine.json tag)
-        required: false
-        default: ""
 
 permissions:
   contents: read
@@ -36,62 +27,23 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
+      - run: bun run candidate
+      - run: bun run build --candidate
 
-      - name: Check out engine
-        env:
-          ENGINE_REF: ${{ inputs.ref }}
-        run: |
-          if [ -n "$ENGINE_REF" ]; then bun run engine --ref "$ENGINE_REF"; else bun run engine; fi
-
-      # A fresh engine checkout has no rust/audio/pkg (gitignored build output that the
-      # published tarball ships), so the pack would omit it and every demo's audio import
-      # would fail to resolve.
-      - name: Add wasm32 target
-        run: rustup target add wasm32-unknown-unknown
-
-      - name: Build audio wasm
-        working-directory: .engine/rust/audio
-        run: |
-          set -e
-          mkdir -p pkg
-          cargo build --target wasm32-unknown-unknown --release
-          WASM=target/wasm32-unknown-unknown/release/shallot_audio.wasm
-          if command -v wasm-opt >/dev/null 2>&1; then
-            wasm-opt -O3 --enable-simd --enable-nontrapping-float-to-int --enable-bulk-memory "$WASM" -o pkg/shallot_audio.wasm
-          else
-            cp "$WASM" pkg/shallot_audio.wasm
-          fi
-          cat > pkg/shallot_audio.js <<'EOF'
-          const url = new URL("shallot_audio.wasm", import.meta.url);
-          export default async function loadAudioWasm() {
-              const response = await fetch(url);
-              return response.arrayBuffer();
-          }
-          EOF
-          cat > pkg/shallot_audio.d.ts <<'EOF'
-          export default function loadAudioWasm(): Promise<ArrayBuffer>;
-          EOF
-
-      # the packed tarball ships the engine's dist/ tooling, which its prepack emits
-      - name: Build engine tooling
-        working-directory: .engine
-        run: bun install && bun run prepack
-
-      - run: bun run build --staging
-
-      # Native carrier gates must pass before the artifact reaches the Cloudflare publish step.
       - run: bun run check
       - run: bun run test
       - run: bun run scripts/check-site.ts
 
       - uses: actions/upload-artifact@v4
         with:
-          name: site-staging
+          name: site-candidate
           path: out/site
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy candidate to Cloudflare Pages
         if: ${{ env.CF_DEPLOY_READY == 'true' }}
         uses: cloudflare/wrangler-action@v3
         with:

@@ -1,39 +1,32 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { root } from "../src/engine";
+import { pathToFileURL } from "node:url";
+import { chromium } from "playwright";
+import { engineCandidate, engineCommit, root } from "../src/engine";
 import { ROSTER } from "../src/roster";
 
-// `bun run demos` — the site demo release gate. Builds every showcase demo as an ejected consumer of
-// the published package (via `bun run site`, which drives `scripts/build-site.ts`), then runs
-// `shallot verify --dist` over every built demo — display-gated, on real hardware. A demo that fails
-// to build or render reds the gate; a demo that skips (the display gate refuses a software adapter,
-// exit 4) reports as skipped and must not be reportable as green — a release gate that skipped is not
-// a release gate that passed.
+// `bun run demos` is the site's display-gated demo gate. It builds ejected consumers through
+// `scripts/build-site.ts`, then asks each built page to use Shallot's public `captureFrame` contract
+// on a positively identified real adapter. A build, adapter, capture, or contract failure reds.
 //
 // The gate's unit is a built HTML entry point, not a demo directory. Per demo, the built `*.html` files
 // under its output dir are enumerated structurally, and each one that presents a `<canvas>` directly is
-// verified through `shallot verify --dist`. A page that hosts a canvas only inside an `<iframe>` (the
-// visualization gallery index) is a link surface, not a verifiable unit — the iframe's target page is
-// verified directly, so counting the container too would double-count. A demo contributing zero verified
+// checked through the public capture contract. A page that hosts a canvas only inside an `<iframe>` is
+// a link surface, not a frame unit; its target page is checked directly. A demo contributing zero
 // entry points is a red, not a skip. The per-demo entry-point count is printed so a gate that silently
 // stops finding pages is visible in its own output.
 //
-// Display-gated exactly like flows and recipes: verify needs a real display + a conformant WebGPU
-// adapter, so on a display-less host it skips honestly (native hardware only). Unlike those routine
-// regression gates, a skip here exits nonzero — this is a release gate, and a skipped release gate
-// is not green. The green run is native hardware with every demo verified.
+// Display-gated on a real display and conformant WebGPU adapter. A missing seat or fallback adapter
+// throws and remains inconclusive, never green. A green run is native hardware with every demo captured.
 //
 // The roster is the single source of truth — imported from `site/roster.ts`, never duplicated. It is
-// derived from `examples/showcase/` by enumeration, so a second copy is impossible by construction
-// rather than caught by a gate (the set-equality clause it used to need is gone). Ejection and
-// building are not re-implemented: `bun run site` already ejects, installs, and builds every roster
-// demo into `out/site/<slug>/`. This script drives that and then verifies the built dirs.
+// derived from the engine's tracked examples by enumeration, so a second copy is impossible by
+// construction. Ejection and building are not re-implemented: `scripts/build-site.ts` already ejects,
+// installs, and builds every roster demo into `out/site/<slug>/`. This script checks those built dirs.
 
 const outDir = resolve(root, "out/site");
 
-// `shallot verify` exits 4 when the display gate refuses a software adapter
-const SKIP_EXIT = 4;
+const CAPTURE_CONTRACT = "final-canvas 1280x720@1 rgba8-tight";
 
 interface DemoOutcome {
     slug: string;
@@ -42,17 +35,66 @@ interface DemoOutcome {
     detail?: string;
 }
 
-/** Runs the published CLI's `shallot verify` over one scratch dir; its exit code is the verdict. */
-function verify(dir: string): number {
-    const run = Bun.spawnSync(
-        ["bunx", "shallot", "verify", dir, "--headed", "--dist", "--timeout", "60000"],
-        { cwd: root, stdout: "inherit", stderr: "inherit" },
-    );
-    return run.exitCode;
+/** Runs one built page in a real browser and asks the page to use Shallot's public `captureFrame`.
+ * The browser is closed in the same finally block that owns the verdict; no screenshot transport or
+ * consumer-local frame reader survives here. */
+async function capture(htmlPath: string, captureScript: string): Promise<number> {
+    const browser = await chromium.launch({
+        headless: false,
+        executablePath:
+            process.env.CHROME_PATH ??
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        args: ["--enable-unsafe-webgpu", "--allow-file-access-from-files"],
+    });
+    try {
+        const page = await browser.newPage({
+            viewport: { width: 1280, height: 720 },
+            deviceScaleFactor: 1,
+        });
+        await page.goto(pathToFileURL(htmlPath).href, {
+            waitUntil: "networkidle",
+            timeout: 60_000,
+        });
+        await page.waitForFunction(
+            () => {
+                const canvas = document.querySelector("canvas");
+                return (
+                    canvas instanceof HTMLCanvasElement &&
+                    canvas.width === 1280 &&
+                    canvas.height === 720
+                );
+            },
+            undefined,
+            { timeout: 60_000 },
+        );
+        await page.addScriptTag({ content: captureScript, type: "module" });
+        await page.waitForFunction(
+            (contract) =>
+                (
+                    window as Window & {
+                        __shallotCaptureResult?: { adapter: string; capture: string };
+                    }
+                ).__shallotCaptureResult?.capture === contract,
+            CAPTURE_CONTRACT,
+            { timeout: 60_000 },
+        );
+        const value = await page.evaluate(
+            () =>
+                (
+                    window as Window & {
+                        __shallotCaptureResult?: { adapter: string; capture: string };
+                    }
+                ).__shallotCaptureResult,
+        );
+        console.log(`  PASS: ${value?.capture} on ${value?.adapter}`);
+        return 0;
+    } finally {
+        await browser.close();
+    }
 }
 
 // A page presents a canvas directly when its own markup contains a `<canvas>` tag. An iframe-hosted
-// canvas is verified by verifying the iframe's target page directly; a page whose only canvases live
+// canvas is captured by capturing the iframe's target page directly; a page whose only canvases live
 // behind `<iframe src=...>` (the visualization gallery index) has no `<canvas>` in its own markup and
 // is not an entry point. The check is structural — read the built HTML, look for the tag — so it does
 // not hardcode any demo's page names and adapts when a multi-page demo adds or renames a page.
@@ -80,30 +122,7 @@ function enumerateEntryPoints(demoOut: string): string[] {
     return htmlFiles.filter(hasDirectCanvas);
 }
 
-// Create a scratch dir whose `dist/` mirrors the demo's build output but with `dist/index.html`
-// replaced by a symlink to the target entry-point HTML file. `shallot verify --dist` serves
-// `<dir>/dist/index.html`, so this makes verify serve the specific entry point while keeping the
-// sibling assets the page references (via `../assets/...`) reachable through symlinks.
-function makeScratch(demoOut: string, entryHtml: string): string {
-    const scratch = join(
-        tmpdir(),
-        `shallot-demos-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    );
-    const dist = join(scratch, "dist");
-    mkdirSync(dist, { recursive: true });
-
-    // Symlink every top-level entry from the demo output into dist/, except index.html (replaced below).
-    for (const entry of readdirSync(demoOut, { withFileTypes: true })) {
-        if (entry.name === "index.html") continue;
-        symlinkSync(resolve(demoOut, entry.name), join(dist, entry.name));
-    }
-    // Replace index.html with a symlink to the target entry point.
-    symlinkSync(entryHtml, join(dist, "index.html"));
-
-    return scratch;
-}
-
-async function runDemo(slug: string): Promise<DemoOutcome> {
+async function runDemo(slug: string, captureScript: string): Promise<DemoOutcome> {
     console.log(`\n--- ${slug} ---`);
 
     const demoOut = resolve(outDir, slug);
@@ -128,29 +147,18 @@ async function runDemo(slug: string): Promise<DemoOutcome> {
     }
 
     let allPass = true;
-    let skipDetail: string | undefined;
     for (const entryHtml of entryPoints) {
         const label = entryHtml.slice(demoOut.length + 1);
-        const scratch = makeScratch(demoOut, entryHtml);
         try {
-            const code = verify(scratch);
-            if (code === SKIP_EXIT) {
-                console.log(`  SKIP: ${label} — display gate refused software adapter`);
-                skipDetail = "display gate refused software adapter";
-                continue;
-            }
+            const code = await capture(entryHtml, captureScript);
             console.log(code === 0 ? `  PASS: ${label}` : `  FAIL: ${label} (exit ${code})`);
             if (code !== 0) allPass = false;
-        } finally {
-            rmSync(scratch, { recursive: true, force: true });
+        } catch (error) {
+            console.error(`  FAIL: ${label} — ${error instanceof Error ? error.message : error}`);
+            allPass = false;
         }
     }
 
-    // A skip on any entry point means the display gate refused — the whole demo skips, since the
-    // hardware can't verify any page. A fail on any (with no skips) means the demo reds.
-    if (skipDetail) {
-        return { slug, result: "skip", entryPoints: entryPoints.length, detail: skipDetail };
-    }
     return { slug, result: allPass ? "pass" : "fail", entryPoints: entryPoints.length };
 }
 
@@ -159,17 +167,23 @@ async function main(): Promise<void> {
     if (args.includes("--help") || args.includes("-h")) {
         console.log(`Usage: bun run demos [--demo <slug>]
 
-Builds every showcase demo (via \`bun run site\`) and runs \`shallot verify --dist\` over each
-built HTML entry point that presents a canvas directly — display-gated, on real hardware. A
-release gate: a skip (exit 4) is not green.
+Builds every showcase demo (via \`bun run build\`) and runs the public \`captureFrame\` contract over each
+built HTML entry point that presents a canvas directly — display-gated, on real hardware. A missing
+seat or off-contract frame refuses; it is not green.
 
 Options:
-  --demo <slug>   Build and verify a single demo by its roster slug`);
+  --demo <slug>   Build and capture a single demo by its roster slug
+  --candidate     Use the qualified full-SHA candidate for both build and capture`);
         process.exit(0);
     }
 
     const idx = args.indexOf("--demo");
     const only = idx !== -1 ? args[idx + 1] : undefined;
+    const candidate = args.includes("--candidate");
+    if (candidate && engineCommit() !== engineCandidate) {
+        console.error(`✗ .engine is at ${engineCommit()}, not candidate ${engineCandidate}`);
+        process.exit(1);
+    }
     if (only && !ROSTER.some((d) => d.slug === only)) {
         console.error(`no demo "${only}" — one of: ${ROSTER.map((d) => d.slug).join(", ")}`);
         process.exit(2);
@@ -177,9 +191,21 @@ Options:
 
     const demos = only ? ROSTER.filter((d) => d.slug === only) : ROSTER;
 
+    const capture = await Bun.build({
+        entrypoints: [resolve(root, "scripts/demos-capture.ts")],
+        target: "browser",
+        minify: true,
+    });
+    if (!capture.success) {
+        for (const log of capture.logs) console.error(log);
+        process.exit(1);
+    }
+    const captureScript = await capture.outputs[0]!.text();
+
     // --- build ---
     console.log("Building site demos...");
     const buildArgs = only ? ["run", "build", "--demo", only] : ["run", "build"];
+    if (candidate) buildArgs.push("--candidate");
     const build = Bun.spawnSync(["bun", ...buildArgs], {
         cwd: root,
         stdout: "inherit",
@@ -190,11 +216,11 @@ Options:
         process.exit(1);
     }
 
-    // --- verify ---
-    console.log("\nVerifying site demos (display-gated)...");
+    // --- capture ---
+    console.log("\nCapturing site demos (display-gated)...");
     const outcomes: DemoOutcome[] = [];
     for (const demo of demos) {
-        outcomes.push(await runDemo(demo.slug));
+        outcomes.push(await runDemo(demo.slug, captureScript));
     }
 
     const passed = outcomes.filter((o) => o.result === "pass").length;

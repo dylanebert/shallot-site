@@ -1,7 +1,15 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { Glob } from "bun";
-import { enginePackage, engineRoot, engineVersion, root } from "../src/engine";
+import {
+    engineCandidate,
+    engineCommit,
+    engineExamples,
+    enginePackage,
+    engineRoot,
+    engineVersion,
+    root,
+} from "../src/engine";
 import { ROSTER } from "../src/roster";
 import {
     RUM_ENV_SNIPPET,
@@ -67,7 +75,7 @@ import { nonWorkspaceShallotDependencies } from "./build-site";
 // (`examples/showcase/roads/` indexed nowhere) is caught earlier by derivation, since an unindexed
 // dir is not a state the build can represent.
 
-const showcaseDir = resolve(engineRoot, "examples/showcase");
+const showcaseDir = engineExamples();
 // `SITE_OUT_DIR` points the artifact clauses at an output dir other than the default — a CI job
 // that downloaded a build artifact elsewhere, or a fixture tree proving clause ordering. The
 // source-side clauses (1-3) always read this repo.
@@ -118,8 +126,8 @@ for (const { slug } of ROSTER) {
         dependencies?: Record<string, string>;
     };
     const dependencies = demoPkg.dependencies ?? {};
-    const engine = dependencies["@dylanebert/shallot"];
-    if (!engine) {
+    const candidateLayout = showcaseDir === resolve(engineRoot, "examples");
+    if (!dependencies["@dylanebert/shallot"] && !candidateLayout) {
         badVersion.push(`${slug}: no @dylanebert/shallot dependency`);
     }
     for (const [name, pin] of nonWorkspaceShallotDependencies(demoPkg)) {
@@ -264,10 +272,15 @@ if (stamp) {
             );
         }
     } else {
-        if (!stamp.mode.pin.startsWith("file:") || !stamp.mode.pin.endsWith(".tgz")) {
+        const expectedPin = `github:dylanebert/shallot#${engineCandidate}`;
+        if (stamp.mode.pin !== expectedPin || stamp.mode.commit !== engineCandidate) {
             fail(
-                `✗ build stamp records staging mode with pin "${stamp.mode.pin}" — expected a ` +
-                    "`file:<tgz>` workspace pin (`scripts/build-site.ts`'s `bun pm pack` step)",
+                `✗ build stamp records staging identity pin "${stamp.mode.pin}" commit "${stamp.mode.commit}" — expected ${expectedPin} at ${engineCandidate}`,
+            );
+        }
+        if (engineCommit() !== engineCandidate) {
+            fail(
+                `✗ staging artifact names ${engineCandidate}, but .engine is at ${engineCommit()}`,
             );
         }
     }

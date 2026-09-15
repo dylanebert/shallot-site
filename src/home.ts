@@ -19,10 +19,9 @@ export function siteIndex(
 ): string {
     // staging labels by ref, never by version tag — a staging build routinely runs ahead of the
     // last release, so `v${version}` may name a GitHub tag that doesn't exist yet.
+    const examplesPath = mode === "staging" ? "examples" : "examples/showcase";
     const codeUrl = (slug: string) =>
-        mode === "staging"
-            ? `https://github.com/dylanebert/shallot/tree/${ref}/examples/showcase/${slug}`
-            : `https://github.com/dylanebert/shallot/tree/v${version}/examples/showcase/${slug}`;
+        `https://github.com/dylanebert/shallot/tree/${mode === "staging" ? ref : `v${version}`}/${examplesPath}/${slug}`;
     const rows = demos
         .map(
             (d) =>
@@ -142,7 +141,7 @@ bun install
 bunx shallot dev
 \`\`\`
 
-\`bunx shallot verify\` boots the project in a headless browser and exits 0 or nonzero, so a change can be checked without a person watching.
+The site's \`bun run demos\` gate builds each ejected demo, then uses Shallot's public \`captureFrame\` contract on a positively identified real-device browser seat. The frame is diagnostic evidence; the fixed capture identity and adapter record carry the verdict.
 
 ## Links
 

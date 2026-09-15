@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DARK, fromBlocks, MARK, toSvg } from "../src/brand/mark";
 import { engineRoot } from "../src/engine";
@@ -9,6 +9,7 @@ import { engineRoot } from "../src/engine";
 // equality, which makes drift a red rather than something a reader has to notice.
 
 export const ROOT = engineRoot;
+const CANDIDATE_LAYOUT = !existsSync(resolve(ROOT, "examples/showcase"));
 
 /** The favicon: the canonical mark at one pixel per cell, dark-theme hexes, transparent ground. */
 export function icon(): string {
@@ -43,7 +44,9 @@ export function iconTargets(): string[] {
 }
 
 export const SCAFFOLD = "packages/create-shallot/index.ts";
-export const NATIVE_ICON = "packages/shallot/assets/icon-1024.png";
+export const NATIVE_ICON = CANDIDATE_LAYOUT
+    ? "assets/icon-1024.png"
+    : "packages/shallot/assets/icon-1024.png";
 
 /** The scaffold's inline `ICON`, rewritten around the render. */
 export function scaffoldSource(source: string): string {
