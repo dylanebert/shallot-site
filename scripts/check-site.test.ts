@@ -26,6 +26,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { check } from "@dylanebert/shallot/harness/check";
+import { engineExamples } from "../src/engine";
 import { ROSTER } from "../src/roster";
 import { datadogInitSnippet } from "../src/rum-config";
 import {
@@ -44,7 +45,7 @@ const engineRoot = resolve(repoRoot, ".engine");
 function requireSiteBuildPremise(): void {
     const required = [
         resolve(engineRoot, ".git"),
-        resolve(engineRoot, "examples/showcase"),
+        engineExamples(),
         resolve(engineRoot, "package.json"),
     ];
     const missing = required.filter((path) => !existsSync(path));
@@ -64,7 +65,11 @@ const releaseVersion = (
     }
 ).version;
 const PROD_MODE: SiteMode = { kind: "prod", version: releaseVersion };
-const STAGING_MODE: SiteMode = { kind: "staging", pin: "file:/tmp/dylanebert-shallot-0.0.0.tgz" };
+const STAGING_MODE: SiteMode = {
+    kind: "staging",
+    pin: "github:dylanebert/shallot#70770cfc34d82fdd19cb705d8753bb6f093748d6",
+    commit: "70770cfc34d82fdd19cb705d8753bb6f093748d6",
+};
 
 check(
     "check-site clause 2 — rejects a fixed workspace extension version",
@@ -541,9 +546,9 @@ check(
 );
 
 check(
-    "check-site — clause 2's artifact leg: a staging stamp naming a non-tarball pin reds",
+    "check-site — clause 2's artifact leg: a staging stamp naming a non-candidate pin reds",
     {
-        claim: "check-site — clause 2's artifact leg: a staging stamp naming a non-tarball pin reds",
+        claim: "check-site — clause 2's artifact leg: a staging stamp naming a non-candidate pin reds",
         size: "integration",
         subject: "engine.json",
     },
@@ -551,10 +556,16 @@ check(
         requireSiteBuildPremise();
         const fixture = modeFixture("staging");
         try {
-            stampFresh(fixture, { kind: "staging", pin: "not-a-file-pin" });
+            stampFresh(fixture, {
+                kind: "staging",
+                pin: "not-a-candidate-pin",
+                commit: "not-the-candidate",
+            });
             const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
             expect(exitCode).toBe(1);
-            expect(out).toContain('build stamp records staging mode with pin "not-a-file-pin"');
+            expect(out).toContain(
+                'build stamp records staging identity pin "not-a-candidate-pin" commit "not-the-candidate"',
+            );
         } finally {
             rmSync(fixture, { recursive: true, force: true });
         }

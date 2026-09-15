@@ -1,34 +1,63 @@
 # shallot-site
 
-The source for [dylanebert.com/shallot](https://dylanebert.com/shallot/), the demo site for the [Shallot](https://github.com/dylanebert/shallot) engine: the index, `llms.txt`, the brand page, and every showcase demo built as a consumer of the published package.
+This repository publishes the Shallot demo site. It carries two identities:
+the installed `shallot` package is the site's carrier, while the selected engine
+identity supplies the demos it ejects and builds.
 
-## How It Builds
+## Build And Check
 
-The showcases stay in the engine repo. `bun run engine` clones `dylanebert/shallot` into `.engine/` at the tag in `engine.json`, and `bun run build` copies each showcase out, pins `@dylanebert/shallot` to the version in this repo's `package.json`, installs from npm and runs `shallot build`. The tag and the npm version must name the same release; the build refuses otherwise.
+Use Bun 1.4.2 and the installed carrier:
 
 ```bash
 bun install --frozen-lockfile
-bun run engine    # clone the repository-owned engine checkout at engine.json's tag
-bun run build     # build every demo into out/site
-bun run pages     # just the index, llms.txt and brand page
-bun run list      # list the complete declared carrier population
-bun run workflow  # regenerate .github/workflows/test-surface.yml
-bun run check     # static/type checks and declared-surface drift
-bun run test      # bounded native unit checks
-bun run test -- --integration -- --base <ref> --diff <ref>  # selected artifact/brand checks
-bun run demos     # build, then `shallot verify` each demo page (needs a GPU and a display)
+bun run list
+bun run test
+bun run check
+bun run workflow
 ```
 
-`bun run engine` and `bun run build` are required premises for the brand and artifact checks;
-missing checkout or output refuses nonzero rather than becoming a green skip. The carrier is pinned
-exactly in `devDependencies` to the landed Shallot commit until the 0.10 release migration.
+The stable path builds the engine tag in `engine.json` and rewrites each ejected
+demo to the stable published version declared in `engine.json.release`:
 
-To move to a new release, bump `engine.json` and the `@dylanebert/shallot` pin together.
+```bash
+bun run engine
+bun run build
+bun run pages
+bun run demos
+```
 
-## How It Deploys
+The unreleased path proves one qualified identity end to end:
 
-GitHub serves a project site at its repo's name, so the `/shallot/` URL belongs to the engine repo's Pages slot. `site.yml` builds on every push to `main` and pushes `out/site` to the `gh-pages` branch of `dylanebert/shallot`.
+```bash
+bun run candidate
+bun run build --candidate
+bun run scripts/check-site.ts
+```
 
-That push uses the `SHALLOT_PAGES_TOKEN` secret: a fine-grained personal access token scoped to `dylanebert/shallot` with Contents read and write. The workflow runs the native carrier `check` and `test` gates before the artifact check and Pages publish. One-time setup on the engine repo: Settings → Pages → Source → "Deploy from a branch", branch `gh-pages`, folder `/`.
+The candidate is Shallot commit
+`70770cfc34d82fdd19cb705d8753bb6f093748d6`. The carrier dev dependency, engine
+checkout, ejected demo dependency and build stamp must agree on that full SHA.
+The stable release is deliberately separate from the candidate carrier: production
+writes `engine.json.release` into each ejected demo manifest and fresh install lock.
+The build installs the candidate from its immutable Git source and runs the
+installed `shallot build` bin. `bun run demos` uses Playwright only to invoke
+Shallot's public `captureFrame` contract in the page. Captures are diagnostic;
+the fixed real-device seat and capture identity are the evidence.
 
-`site-staging.yml` builds the same site against the engine's `main`, runs the same native gates before its artifact check, and deploys it to Cloudflare Pages at [shallot-staging.pages.dev](https://shallot-staging.pages.dev/) when `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are set.
+Missing checkout, stale output, mismatched identities, fallback hardware or a
+zero discovered population refuses. `bun run list` and `bun run test` are
+non-vacuous when their changed-subject integration selector is used. The
+site's TypeScript, Biome, roster, artifact and RUM checks remain independent of
+the installed carrier.
+
+## Deployment
+
+Production deploys only the stable published-range build after the tag and
+package name the same release, the fresh artifact checks pass, and real RUM
+credentials are present. Candidate staging is a proof artifact; Cloudflare
+deployment is conditional on its named credentials and is not part of local
+done evidence. GitHub Pages publishes `out/site` to the engine repository's
+`gh-pages` branch through `site.yml`.
+
+For the full local-entry, identity, realpath and clean-exit contract, read
+[`AGENTS.md`](AGENTS.md).

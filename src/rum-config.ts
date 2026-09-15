@@ -32,7 +32,7 @@ export const RUM_ENV_SNIPPET =
 // `RUM_ENV_SNIPPET`'s regex has nothing to key on there; rather than generalize that regex (which
 // would put the prod path at risk for staging's sake), `scripts/build-site.ts` selects between the
 // two sibling constants by build mode. Same shared-literal discipline as `RUM_ENV_SNIPPET`:
-// `build-site.ts` injects this verbatim in `--staging` mode and `check-site.ts`'s clause-5 env
+// `build-site.ts` injects this verbatim in candidate staging mode and `check-site.ts`'s clause-5 env
 // check matches on the same literal, so the two never drift apart. `RUM_ENV_USAGE` below is
 // shared unchanged — it wires whichever of the two derivations ran into `DD_RUM.init`.
 export const RUM_ENV_SNIPPET_STAGING = "var ddEnv='staging';";
@@ -52,14 +52,14 @@ export const RUM_ENV_USAGE = "Object.assign({env:ddEnv},";
 const DATADOG_RUM_CDN_MAJOR = 6;
 const DATADOG_RUM_CDN_URL = `https://www.datadoghq-browser-agent.com/us1/v${DATADOG_RUM_CDN_MAJOR}/datadog-rum.js`;
 
-// `crossOrigin='anonymous'` on the injected script element: `shallot verify`'s dist/dev preview sends
+// `crossOrigin='anonymous'` on the injected script element: the browser capture gate's file preview sends
 // `Cross-Origin-Embedder-Policy: require-corp` (`src/project/vite.ts`, unconditional on
 // every serve surface — for the multithreaded WASM kernel, unrelated to RUM) and the CDN never sends a
 // `Cross-Origin-Resource-Policy` header, so a plain no-cors `<script src>` load is blocked
 // (`net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep`, reproduced 2026-08-25 —
 // every `bun run demos` entry point failed on it). The CDN does answer a CORS request with
 // `Access-Control-Allow-Origin: *` (verified against a request carrying an `Origin` header), and a
-// CORS-mode load is exempt from the CORP check entirely — so `crossOrigin` fixes the verify-only failure
+// CORS-mode load is exempt from the CORP check entirely — so `crossOrigin` fixes the file-preview failure
 // without needing a header change in the engine package (out of scope) or the deployed site, which never
 // sets COEP (a static host can't set headers, the doc comment above `CROSS_ORIGIN_ISOLATION` already notes).
 export function datadogInitSnippet(mode: "prod" | "staging" = "prod"): string {

@@ -3,23 +3,23 @@
     "version": "0.9.5",
     "private": true,
     "type": "module",
+    "packageManager": "bun@1.4.2",
     "scripts": {
         "engine": "bun run scripts/engine-checkout.ts",
         "build": "bun run scripts/build-site.ts",
         "pages": "bun run scripts/build-pages.ts",
         "demos": "bun run scripts/demos.ts",
+        "candidate": "bun run engine --candidate",
         "list": "shallot list",
         "workflow": "shallot workflow",
         "check": "tsc --noEmit && biome check && shallot check",
         "test": "shallot test"
     },
-    "dependencies": {
-        "@dylanebert/shallot": "0.9.5"
-    },
     "devDependencies": {
         "@biomejs/biome": "^2.5.13",
-        "@dylanebert/shallot": "github:dylanebert/shallot#83ee2a918d26a5868d0b703c94a1b7cbf5f28c30",
+        "@dylanebert/shallot": "github:dylanebert/shallot#70770cfc34d82fdd19cb705d8753bb6f093748d6",
         "@types/bun": "latest",
+        "playwright": "^1.63.0",
         "typescript": "^7.0.2"
     }
 }

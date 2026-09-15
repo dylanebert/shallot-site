@@ -13,7 +13,9 @@ import { join, resolve, sep } from "node:path";
 import { Glob } from "bun";
 import {
     checkoutTag,
-    enginePackage,
+    engineCandidate,
+    engineCommit,
+    engineExamples,
     engineRef,
     engineRoot,
     engineTag,
@@ -39,22 +41,17 @@ export {
 // re-exported here because the site tests import it from this module
 export { datadogInitSnippet };
 
-// `bun run build` — build every showcase demo in the engine checkout (`bun run engine`) as an
-// ejected consumer of the *published* package, then assemble the site index. Each demo is copied
-// to a scratch tree under /tmp with two files rewritten: a standalone `package.json` pinning
-// `@dylanebert/shallot` to the version this repo's `package.json` pins (every other dep carried
-// over as authored), and a standalone `tsconfig.json`. The scratch tree installs against npm and
-// builds with `shallot build`, so the artifact is a real published-consumer build.
-//
-// `--staging` is the same pipeline with one pin swapped: `bun pm pack` packs the engine checkout
-// once (check out `main` with `bun run engine --ref main`), and every demo's `@dylanebert/shallot`
-// dependency is rewritten to `file:<tgz>`. The RUM env constant and the index label switch with it.
+// `bun run build` builds every showcase demo from the stable engine tag as an ejected consumer
+// of the published package. `--candidate` uses the same pipeline against the qualified full-SHA
+// Git candidate for unreleased proof. Each demo is copied to /tmp, its Shallot dependency is
+// rewritten to the selected immutable identity, and the installed `shallot build` bin creates the
+// artifact.
 
 /** the literal `PIPELINE_COMPILE_MEASURE_PREFIX` in the engine's `src/engine/runtime/gpu.ts`;
  * the engine exports no subpath for it, and the RUM bundle needs only the string */
 const PIPELINE_COMPILE_MEASURE_PREFIX = "shallot:pipeline-compile:";
 
-const showcaseDir = resolve(engineRoot, "examples/showcase");
+const showcaseDir = engineExamples();
 const outDir = resolve(root, "out/site");
 
 /** Bundles `src/rum-runtime.ts` (which imports the pure sampler) to a single browser-target ESM
@@ -100,23 +97,22 @@ function injectRum(dir: string, runtimeBundle: string, mode: "prod" | "staging")
 async function main(): Promise<void> {
     const args = process.argv.slice(2);
     if (args.includes("--help") || args.includes("-h")) {
-        console.log(`Usage: bun run build [--demo <slug>] [--staging]
+        console.log(`Usage: bun run build [--demo <slug>] [--candidate]
 
-Builds every showcase demo in .engine/ as an ejected consumer of the published
-@dylanebert/shallot, assembles out/site/<slug>/ per demo, and emits out/site/index.html.
+Builds every showcase demo in .engine/ as an ejected consumer of the selected
+@dylanebert/shallot identity, assembles out/site/<slug>/ per demo, and emits out/site/index.html.
 
 Options:
   --demo <slug>   Build a single demo by its roster slug
-  --staging       Pin @dylanebert/shallot to a packed tarball of the engine checkout instead
-                   of the release version, and tag the RUM env + index label "staging"`);
+  --candidate     Use the qualified full-SHA Git candidate instead of the stable release`);
         process.exit(0);
     }
 
     const idx = args.indexOf("--demo");
     const only = idx !== -1 ? args[idx + 1] : undefined;
 
-    const staging = args.includes("--staging");
-    const mode: "prod" | "staging" = staging ? "staging" : "prod";
+    const candidate = args.includes("--candidate");
+    const mode: "prod" | "staging" = candidate ? "staging" : "prod";
 
     if (!existsSync(showcaseDir)) {
         console.error(`✗ no engine checkout at ${engineRoot} — run \`bun run engine\` first`);
@@ -124,7 +120,14 @@ Options:
     }
     const version = engineVersion;
     const refShort = engineRef();
-    if (!staging) {
+    if (candidate) {
+        if (engineCommit() !== engineCandidate) {
+            console.error(
+                `✗ .engine is at ${engineCommit()}, not candidate ${engineCandidate} — run \`bun run candidate\``,
+            );
+            process.exit(1);
+        }
+    } else {
         const tag = checkoutTag();
         if (tag !== engineTag) {
             console.error(
@@ -185,7 +188,7 @@ Options:
         if (!tgz) throw new Error(`no tarball produced in ${destination}`);
         return `file:${resolve(destination, tgz)}`;
     };
-    if (staging) enginePin = pack("@dylanebert/shallot", enginePackage());
+    if (candidate) enginePin = `github:dylanebert/shallot#${engineCandidate}`;
     for (const name of [...extensionNames].sort()) {
         const packageDir = resolve(engineRoot, "packages", name.slice("@dylanebert/".length));
         extensionPins.set(name, pack(name, packageDir));
@@ -290,10 +293,10 @@ Options:
     // record what each demo was built from, so `check-site.ts` can tell an artifact of *these*
     // sources from an artifact of some other sources. A production build reads an immutable tag,
     // so its entries record the tag rather than a tree fingerprint.
-    const siteMode: SiteMode = staging
-        ? { kind: "staging", pin: enginePin }
+    const siteMode: SiteMode = candidate
+        ? { kind: "staging", pin: enginePin, commit: engineCommit() }
         : { kind: "prod", version, tag: engineTag };
-    const fingerprints = staging
+    const fingerprints = candidate
         ? demoFingerprints(
               engineRoot,
               demos.map((d) => d.slug),
@@ -310,7 +313,7 @@ Options:
     console.log(`  total: ${formatSize(total)}`);
     console.log(`\n  index: ${resolve(outDir, "index.html")}`);
     console.log(
-        `  built from: ${staging ? `staging (${enginePin})` : `v${version}`} (engine ${refShort})`,
+        `  built from: ${candidate ? `candidate (${enginePin})` : `v${version}`} (engine ${refShort})`,
     );
 }
 
