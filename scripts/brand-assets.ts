@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { DARK, fromBlocks, MARK, toSvg } from "../src/brand/mark";
+import { DARK, fromBlocks, MARK, toSvg } from "@dylanebert/shallot/brand";
 import { engineRoot } from "../src/engine";
 
 // Every default icon a shallot project ships is a render of the one bitmap mark, so the shape

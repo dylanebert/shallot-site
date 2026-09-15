@@ -1,5 +1,5 @@
 import { deflateSync, inflateSync } from "node:zlib";
-import type { Grid, Palette } from "./mark";
+import type { Grid, Palette } from "@dylanebert/shallot/brand";
 
 // Minimal PNG writer for pixel-art exports: 8-bit RGBA, no filtering, one IDAT. Enough for a
 // few-kilobyte mark; a general encoder would be a dependency for nothing.
