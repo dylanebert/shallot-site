@@ -13,7 +13,7 @@
         "list": "shallot list",
         "workflow": "shallot workflow",
         "check": "tsc --noEmit && biome check && shallot check",
-        "test": "shallot test"
+        "test": "bun run scripts/test.ts"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.5.13",
