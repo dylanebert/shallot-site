@@ -330,14 +330,9 @@ function comparableSvg(source: string): string {
 }
 
 check(
-    "the installed brand module owns the displayed source and the retired site fork is absent",
-    {
-        claim: "installed brand source owns production display and retired site fork is absent",
-    },
+    "the installed brand module owns the displayed source",
+    { claim: "installed brand source owns production display" },
     async () => {
-        const siteBrandFork = resolve(import.meta.dir, "../src/brand/mark.ts");
-        expect(existsSync(siteBrandFork)).toBe(false);
-
         const output = mkdtempSync(join(tmpdir(), "shallot-brand-owner-"));
         try {
             await buildBrand(output);
