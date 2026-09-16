@@ -65,15 +65,16 @@ const sitePackage = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "
 };
 const releaseVersion = sitePackage.version;
 const PROD_MODE: SiteMode = { kind: "prod", version: releaseVersion };
-// the candidate identity is the carrier dev dependency itself, never a copied literal
-const candidatePin = sitePackage.devDependencies["@dylanebert/shallot"];
-const candidateCommit = /^github:dylanebert\/shallot#([0-9a-f]{40})$/.exec(candidatePin)?.[1];
-if (!candidateCommit) {
-    throw new Error(
-        `refused: package.json carrier pin is not a full-SHA candidate (${candidatePin})`,
-    );
+/** The candidate identity is the carrier dev dependency itself, never a copied literal; only the
+ * staging rows need it, so a stable pin refuses there rather than at load. */
+function stagingMode(): SiteMode {
+    const pin = sitePackage.devDependencies["@dylanebert/shallot"];
+    const commit = /^github:dylanebert\/shallot#([0-9a-f]{40})$/.exec(pin)?.[1];
+    if (!commit) {
+        throw new Error(`refused: package.json carrier pin is not a full-SHA candidate (${pin})`);
+    }
+    return { kind: "staging", pin, commit };
 }
-const STAGING_MODE: SiteMode = { kind: "staging", pin: candidatePin, commit: candidateCommit };
 
 check(
     "check-site clause 2 — rejects a fixed workspace extension version",
@@ -404,7 +405,7 @@ check(
         requireSiteBuildPremise();
         const fixture = modeFixture("staging");
         try {
-            stampFresh(fixture, STAGING_MODE);
+            stampFresh(fixture, stagingMode());
             const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
             expect(exitCode).toBe(0);
             expect(out).toContain("✓");
@@ -469,7 +470,7 @@ check(
         requireSiteBuildPremise();
         const fixture = modeFixture("prod");
         try {
-            stampFresh(fixture, STAGING_MODE); // wrong clause set: mode says staging, content is prod
+            stampFresh(fixture, stagingMode()); // wrong clause set: mode says staging, content is prod
             const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
             expect(exitCode).toBe(1);
             expect(out).toContain("missing the RUM env-derivation snippet for staging mode");
