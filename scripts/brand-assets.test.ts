@@ -374,10 +374,6 @@ check(
     },
     () => {
         requireEngineCheckout();
-        if (CANDIDATE_LAYOUT) {
-            expect(iconTargets().length).toBeGreaterThan(0);
-            return;
-        }
         const own = "examples/flows/no-walls/public/icon.svg";
         expect(iconTargets()).not.toContain(own);
         expect(read(own)).toContain('fill="#f233b3"');
