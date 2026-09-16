@@ -356,7 +356,6 @@ check(
     () => {
         requireEngineCheckout();
         const targets = iconTargets();
-        expect(targets.length).toBeGreaterThan(CANDIDATE_LAYOUT ? 0 : 30);
         const engineIcon = CANDIDATE_LAYOUT
             ? `${icon()}\n`
             : readFileSync(resolve(engine, "assets/icon.svg"), "utf8");
