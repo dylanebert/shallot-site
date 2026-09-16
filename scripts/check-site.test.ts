@@ -136,7 +136,7 @@ check(
     {
         claim: "check-site — an unstamped built artifact refuses as stale, not as a title defect",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -157,7 +157,7 @@ check(
     {
         claim: "check-site — a stale artifact on the deploy path reds on staleness, not on the title",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -185,10 +185,9 @@ check(
     {
         claim: "check-site — a fresh artifact is judged: clause 6 reds on the pre-fix title",
         size: "integration",
-        subject: "engine.json",
+        subject: "src/site-stamp.ts",
     },
     () => {
-        requireSiteBuildPremise();
         const fixture = preFixFixture();
         try {
             writeStamp(
@@ -245,10 +244,9 @@ check(
     {
         claim: "site-stamp — the fingerprint moves on a demo source, a builder, and the release version",
         size: "integration",
-        subject: "engine.json",
+        subject: "src/site-stamp.ts",
     },
     () => {
-        requireSiteBuildPremise();
         const dir = fixtureRepo();
         try {
             const fp = () => demoFingerprints(dir, ["demo"]).demo;
@@ -301,10 +299,9 @@ check(
     {
         claim: "site-stamp — staleness is per demo dir, and an absent dir is not stale",
         size: "integration",
-        subject: "engine.json",
+        subject: "src/site-stamp.ts",
     },
     () => {
-        requireSiteBuildPremise();
         const dir = fixtureRepo();
         const out = mkdtempSync(join(tmpdir(), "site-stamp-out-"));
         try {
@@ -334,10 +331,9 @@ check(
     {
         claim: "site-stamp — a stamp write merges over a prior build's other slots",
         size: "integration",
-        subject: "engine.json",
+        subject: "src/site-stamp.ts",
     },
     () => {
-        requireSiteBuildPremise();
         const out = mkdtempSync(join(tmpdir(), "site-stamp-merge-"));
         try {
             writeStamp(out, { a: "aaa", b: "bbb" }, PROD_MODE);
@@ -398,7 +394,7 @@ check(
     {
         claim: "check-site — a staging artifact stamped staging passes clean",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -419,7 +415,7 @@ check(
     {
         claim: "check-site — a prod artifact stamped prod passes clean",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -442,7 +438,7 @@ check(
     {
         claim: "check-site — a staging artifact judged with the prod clause set reds",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -463,7 +459,7 @@ check(
     {
         claim: "check-site — a prod artifact judged with the staging clause set reds",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -484,7 +480,7 @@ check(
     {
         claim: "check-site — a page carrying both mode's env literals reds on the two-sided check",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -527,7 +523,7 @@ check(
     {
         claim: "check-site — clause 2's artifact leg: a prod stamp naming a stale version reds",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -550,7 +546,7 @@ check(
     {
         claim: "check-site — clause 2's artifact leg: a staging stamp naming a non-candidate pin reds",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
