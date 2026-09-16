@@ -59,17 +59,22 @@ function requireSiteBuildPremise(): void {
 // the real repo's release version — the fixtures below stamp `prod` mode with it so clause 2's
 // mode-branched pin check (new in the staging build mode) reads a matching version rather than
 // failing ahead of the clause each fixture actually exercises.
-const releaseVersion = (
-    JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8")) as {
-        version: string;
-    }
-).version;
-const PROD_MODE: SiteMode = { kind: "prod", version: releaseVersion };
-const STAGING_MODE: SiteMode = {
-    kind: "staging",
-    pin: "github:dylanebert/shallot#0664218f465224397b80aeb604b51178ac71cfb2",
-    commit: "0664218f465224397b80aeb604b51178ac71cfb2",
+const sitePackage = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8")) as {
+    version: string;
+    devDependencies: Record<string, string>;
 };
+const releaseVersion = sitePackage.version;
+const PROD_MODE: SiteMode = { kind: "prod", version: releaseVersion };
+/** The candidate identity is the carrier dev dependency itself, never a copied literal; only the
+ * staging rows need it, so a stable pin refuses there rather than at load. */
+function stagingMode(): SiteMode {
+    const pin = sitePackage.devDependencies["@dylanebert/shallot"];
+    const commit = /^github:dylanebert\/shallot#([0-9a-f]{40})$/.exec(pin)?.[1];
+    if (!commit) {
+        throw new Error(`refused: package.json carrier pin is not a full-SHA candidate (${pin})`);
+    }
+    return { kind: "staging", pin, commit };
+}
 
 check(
     "check-site clause 2 — rejects a fixed workspace extension version",
@@ -136,7 +141,7 @@ check(
     {
         claim: "check-site — an unstamped built artifact refuses as stale, not as a title defect",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -157,7 +162,7 @@ check(
     {
         claim: "check-site — a stale artifact on the deploy path reds on staleness, not on the title",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -185,10 +190,9 @@ check(
     {
         claim: "check-site — a fresh artifact is judged: clause 6 reds on the pre-fix title",
         size: "integration",
-        subject: "engine.json",
+        subject: "src/site-stamp.ts",
     },
     () => {
-        requireSiteBuildPremise();
         const fixture = preFixFixture();
         try {
             writeStamp(
@@ -245,10 +249,9 @@ check(
     {
         claim: "site-stamp — the fingerprint moves on a demo source, a builder, and the release version",
         size: "integration",
-        subject: "engine.json",
+        subject: "src/site-stamp.ts",
     },
     () => {
-        requireSiteBuildPremise();
         const dir = fixtureRepo();
         try {
             const fp = () => demoFingerprints(dir, ["demo"]).demo;
@@ -301,10 +304,9 @@ check(
     {
         claim: "site-stamp — staleness is per demo dir, and an absent dir is not stale",
         size: "integration",
-        subject: "engine.json",
+        subject: "src/site-stamp.ts",
     },
     () => {
-        requireSiteBuildPremise();
         const dir = fixtureRepo();
         const out = mkdtempSync(join(tmpdir(), "site-stamp-out-"));
         try {
@@ -334,10 +336,9 @@ check(
     {
         claim: "site-stamp — a stamp write merges over a prior build's other slots",
         size: "integration",
-        subject: "engine.json",
+        subject: "src/site-stamp.ts",
     },
     () => {
-        requireSiteBuildPremise();
         const out = mkdtempSync(join(tmpdir(), "site-stamp-merge-"));
         try {
             writeStamp(out, { a: "aaa", b: "bbb" }, PROD_MODE);
@@ -398,13 +399,13 @@ check(
     {
         claim: "check-site — a staging artifact stamped staging passes clean",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
         const fixture = modeFixture("staging");
         try {
-            stampFresh(fixture, STAGING_MODE);
+            stampFresh(fixture, stagingMode());
             const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
             expect(exitCode).toBe(0);
             expect(out).toContain("✓");
@@ -419,7 +420,7 @@ check(
     {
         claim: "check-site — a prod artifact stamped prod passes clean",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -442,7 +443,7 @@ check(
     {
         claim: "check-site — a staging artifact judged with the prod clause set reds",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -463,13 +464,13 @@ check(
     {
         claim: "check-site — a prod artifact judged with the staging clause set reds",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
         const fixture = modeFixture("prod");
         try {
-            stampFresh(fixture, STAGING_MODE); // wrong clause set: mode says staging, content is prod
+            stampFresh(fixture, stagingMode()); // wrong clause set: mode says staging, content is prod
             const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
             expect(exitCode).toBe(1);
             expect(out).toContain("missing the RUM env-derivation snippet for staging mode");
@@ -484,7 +485,7 @@ check(
     {
         claim: "check-site — a page carrying both mode's env literals reds on the two-sided check",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -527,7 +528,7 @@ check(
     {
         claim: "check-site — clause 2's artifact leg: a prod stamp naming a stale version reds",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
@@ -550,7 +551,7 @@ check(
     {
         claim: "check-site — clause 2's artifact leg: a staging stamp naming a non-candidate pin reds",
         size: "integration",
-        subject: "engine.json",
+        subject: "scripts/check-site.ts",
     },
     () => {
         requireSiteBuildPremise();
