@@ -59,17 +59,21 @@ function requireSiteBuildPremise(): void {
 // the real repo's release version — the fixtures below stamp `prod` mode with it so clause 2's
 // mode-branched pin check (new in the staging build mode) reads a matching version rather than
 // failing ahead of the clause each fixture actually exercises.
-const releaseVersion = (
-    JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8")) as {
-        version: string;
-    }
-).version;
-const PROD_MODE: SiteMode = { kind: "prod", version: releaseVersion };
-const STAGING_MODE: SiteMode = {
-    kind: "staging",
-    pin: "github:dylanebert/shallot#0664218f465224397b80aeb604b51178ac71cfb2",
-    commit: "0664218f465224397b80aeb604b51178ac71cfb2",
+const sitePackage = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8")) as {
+    version: string;
+    devDependencies: Record<string, string>;
 };
+const releaseVersion = sitePackage.version;
+const PROD_MODE: SiteMode = { kind: "prod", version: releaseVersion };
+// the candidate identity is the carrier dev dependency itself, never a copied literal
+const candidatePin = sitePackage.devDependencies["@dylanebert/shallot"];
+const candidateCommit = /^github:dylanebert\/shallot#([0-9a-f]{40})$/.exec(candidatePin)?.[1];
+if (!candidateCommit) {
+    throw new Error(
+        `refused: package.json carrier pin is not a full-SHA candidate (${candidatePin})`,
+    );
+}
+const STAGING_MODE: SiteMode = { kind: "staging", pin: candidatePin, commit: candidateCommit };
 
 check(
     "check-site clause 2 — rejects a fixed workspace extension version",
