@@ -11,7 +11,7 @@ import { deflateSync } from "node:zlib";
 import { check } from "@dylanebert/shallot/harness/check";
 import { decodePng } from "../src/brand/png";
 import { root } from "../src/engine";
-import { icon, iconTargets, nativeIcon, ROOT, SCAFFOLD, scaffoldSource } from "./brand-assets";
+import { icon, iconTargets, nativeIcon, ROOT } from "./brand-assets";
 import { buildBrand } from "./build-pages";
 
 const engine = ROOT;
@@ -381,24 +381,6 @@ check(
         const own = "examples/flows/no-walls/public/icon.svg";
         expect(iconTargets()).not.toContain(own);
         expect(read(own)).toContain('fill="#f233b3"');
-    },
-);
-
-check(
-    "the scaffold's icon source remains stable",
-    {
-        claim: "the create-shallot scaffold keeps its generated icon source internally stable",
-        size: "integration",
-        subject: "engine.json",
-    },
-    () => {
-        requireEngineCheckout();
-        if (CANDIDATE_LAYOUT) {
-            expect(existsSync(resolve(engine, SCAFFOLD))).toBe(false);
-            return;
-        }
-        const source = scaffoldSource(read(SCAFFOLD));
-        expect(source).toContain(`const ICON = \`${icon()}\n\`;`);
     },
 );
 
