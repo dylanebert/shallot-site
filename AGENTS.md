@@ -1,65 +1,11 @@
-# Shallot Site Agent Contract
+This repository builds and checks the Shallot site from the engine's showcase demos.
 
-## Admission
+Checks: `bun run check` and `bun run test`.
 
-Use Bun **1.4.2** exactly. Set `BUN` to that executable and refuse a different
-`$BUN --version`. The site has two roles:
+Package states: https://github.com/dylanebert/shallot/blob/main/CONTRIBUTING.md#dependencies
 
-- the installed `shallot` carrier runs `list`, `test`, `check` and `workflow` for
-  this repository; the site's TypeScript, Biome and artifact checks remain
-  independent;
-- the engine identity supplies the demos that the site ejects and builds.
+`engine.json` holds the site's engine identity. `release` is the stable version production ejection writes into every demo manifest and its fresh install lock; `tag` is that release's tag; `candidate` is the full SHA that the carrier dev dependency, engine checkout, demo manifest rewrite and build stamp all carry in a candidate build. `release` stays separate from the carrier dev dependency so a local link can replace the installed carrier without a duplicate dependency.
 
-The stable release declaration is `engine.json.release`; production ejection
-writes that stable version into every demo manifest and its fresh install lock.
-It is separate from the candidate-only carrier dependency so the sanctioned
-local link can replace the installed carrier without a duplicate dependency.
+`bun run demos` diagnostic artifacts are not verdicts.
 
-Supported package states are local development, immutable candidate staging and
-stable published deployment. Stable deployment is the named
-release exit: `engine.json.tag` and `engine.json.release` must identify the same
-published release. A candidate build must use the same full SHA in the
-carrier dev dependency, `engine.json.candidate`, engine checkout, demo
-manifest rewrite, and build stamp. A tag, package, checkout or demo mismatch
-refuses.
-
-## Entry And Proof
-
-Use the installed bin, never a host checkout or
-`node_modules/@dylanebert/shallot/scripts` path:
-
-```sh
-"$BUN" run list
-"$BUN" run test
-"$BUN" run check
-"$BUN" run workflow
-```
-
-For candidate proof, `"$BUN" run candidate` enters the immutable checkout and
-`"$BUN" run build --candidate` ejects each demo, then invokes
-the installed `shallot build` bin. `"$BUN" run demos` uses Playwright only to
-invoke Shallot's public `captureFrame` contract in the page
-(`final-canvas 1280x720@1 rgba8-tight`); diagnostic
-artifacts are not verdicts. A real GPU seat is required. Fallback, missing
-adapter, missing display, and missing build output refuse.
-
-Record producer and consumer HEAD and dirt, the SHA-256 hashes of `package.json`
-and `bun.lock`, the manifest and lock identities, the installed package
-metadata, and `realpath node_modules/@dylanebert/shallot`. Local entry uses
-`"$BUN" link` in the producer and `"$BUN" link @dylanebert/shallot --no-save`
-in this consumer; the realpath must equal the producer and manifest/lock
-hashes must not change. Staging and published proof use a newly empty explicit
-cache and `"$BUN" install --frozen-lockfile --cache-dir "$CACHE"`; staged
-identity carries the complete 40-hex SHA and published identity carries its
-stable declaration and exact lock resolution. A saved `link:` or `file:` source,
-short or moving ref, mutable tag, or unexplained artifact refuses.
-
-## Exit
-
-Exit local entry with `"$BUN" install --force --frozen-lockfile --cache-dir
-"$CACHE"`, prove the installed realpath is no producer path, prove the
-candidate or stable manifest, lock and installed metadata identity, and rerun
-the focused gate. Run a second fresh-cache frozen install. Leave no producer
-symlink or local-directory residue. Do not deploy without the named stable
-release, real credentials, fresh artifact, and all product gates; an absent
-premise is inconclusive, never green.
+In local development, record producer and consumer HEAD and dirt and the `package.json` and `bun.lock` hashes before linking; the installed `realpath node_modules/@dylanebert/shallot` must equal the producer and those hashes must not change. After leaving local, prove the realpath is no producer path, rerun the focused gate, run a second fresh-cache frozen install, and leave no producer symlink or local-directory residue. Do not deploy without the named stable release, real credentials, a fresh artifact and all product gates; an absent premise is inconclusive, never green.
