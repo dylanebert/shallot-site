@@ -16,8 +16,7 @@ It is separate from the candidate-only carrier dependency so the sanctioned
 local link can replace the installed carrier without a duplicate dependency.
 
 Supported package states are local development, immutable candidate staging and
-stable published deployment. The unreleased candidate is
-`0664218f465224397b80aeb604b51178ac71cfb2`. Stable deployment is the named
+stable published deployment. Stable deployment is the named
 release exit: `engine.json.tag` and `engine.json.release` must identify the same
 published release. A candidate build must use the same full SHA in the
 carrier dev dependency, `engine.json.candidate`, engine checkout, demo
@@ -37,8 +36,7 @@ Use the installed bin, never a host checkout or
 ```
 
 For candidate proof, `"$BUN" run candidate` enters the immutable checkout and
-`"$BUN" run build --candidate` ejects each demo with
-`github:dylanebert/shallot#0664218f465224397b80aeb604b51178ac71cfb2`, then invokes
+`"$BUN" run build --candidate` ejects each demo, then invokes
 the installed `shallot build` bin. `"$BUN" run demos` uses Playwright only to
 invoke Shallot's public `captureFrame` contract in the page
 (`final-canvas 1280x720@1 rgba8-tight`); diagnostic
