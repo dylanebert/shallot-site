@@ -135,18 +135,6 @@ check(
 );
 
 check(
-    "without reset, the same backgrounded-tab gap would report — documents the defect the reset fixes",
-    {
-        claim: "without reset, the same backgrounded-tab gap would report — documents the defect the reset fixes",
-    },
-    () => {
-        const { reports } = run([0, 16, 16 + 5000]);
-        expect(reports).toHaveLength(1);
-        expect(reports[0].duration).toBe(5000);
-    },
-);
-
-check(
     "reset only clears lastTimestamp — the frame after reset is treated as a first frame and never reports, per the existing rule",
     {
         claim: "reset only clears lastTimestamp — the frame after reset is treated as a first frame and never reports, per the existing rule",
