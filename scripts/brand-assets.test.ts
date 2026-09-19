@@ -83,21 +83,6 @@ check(
 );
 
 check(
-    "a project's own icon stays its own",
-    {
-        claim: "a showcase-owned icon remains excluded from default brand regeneration",
-        size: "integration",
-        subject: "engine.json",
-    },
-    () => {
-        requireEngineCheckout();
-        const own = "examples/flows/no-walls/public/icon.svg";
-        expect(iconTargets()).not.toContain(own);
-        expect(read(own)).toContain('fill="#f233b3"');
-    },
-);
-
-check(
     "the native window icon is the canonical square mark",
     {
         claim: "the shipped native icon remains the canonical 960-pixel square mark",

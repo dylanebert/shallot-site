@@ -21,13 +21,6 @@ export function nativeIcon(): Uint8Array {
     return readFileSync(resolve(ROOT, NATIVE_ICON));
 }
 
-// A project's own icon wins over the default. Each entry names the content that makes it the
-// project's own; lose that marker and the file falls back into the regenerated population, so a
-// corrupted icon still reds instead of reading as a deliberate one.
-const OWN_ICONS: Record<string, string> = {
-    "examples/flows/no-walls/public/icon.svg": 'fill="#f233b3"',
-};
-
 /** Tracked example icons that carry the default, relative to the repo root. */
 export function iconTargets(): string[] {
     const tracked = Bun.spawnSync(["git", "ls-files", "-z", "examples"], { cwd: ROOT });
@@ -37,10 +30,7 @@ export function iconTargets(): string[] {
         .split("\0")
         .filter((file) => file.endsWith("/public/icon.svg"));
     if (files.length === 0) throw new Error("brand-assets: no example icons — the check is empty");
-    return files.filter((file) => {
-        const own = OWN_ICONS[file];
-        return !own || !readFileSync(resolve(ROOT, file), "utf8").includes(own);
-    });
+    return files;
 }
 
 export const SCAFFOLD = "packages/create-shallot/index.ts";
