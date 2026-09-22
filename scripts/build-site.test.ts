@@ -4,12 +4,31 @@
 
 import { expect } from "bun:test";
 import { check } from "@dylanebert/shallot/harness/check";
+import { llmsTxt } from "../src/home";
 import { datadogInitSnippet, RUM_ENV_SNIPPET, RUM_ENV_SNIPPET_STAGING } from "../src/rum-config";
 import {
     rewriteSiteDependencies,
     shallotDependencies,
     workspaceExtensionDependencies,
 } from "./build-site-logic";
+
+check(
+    "llms entry points at consumer references",
+    {
+        claim: "the agent entry points at the installed README and examples index, not contributor instructions",
+    },
+    () => {
+        const text = llmsTxt("0.9.5", "abc123", "prod");
+        expect(text).toContain(
+            "[README](https://raw.githubusercontent.com/dylanebert/shallot/v0.9.5/README.md): setup, CLI, recipes, live demos and build targets.",
+        );
+        expect(text).toContain(
+            "[Examples index](https://raw.githubusercontent.com/dylanebert/shallot/v0.9.5/examples/AGENTS.md): one line per recipe and showcase project, with the concept each teaches.",
+        );
+        expect(text).not.toContain("Consumer contract");
+        expect(text).not.toContain("raw.githubusercontent.com/dylanebert/shallot/v0.9.5/AGENTS.md");
+    },
+);
 
 // S1 (staging build mode) — datadogInitSnippet is a pure function, so its mode selection is
 // armed behaviorally.

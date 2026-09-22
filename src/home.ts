@@ -124,13 +124,12 @@ export function llmsTxt(version: string, ref: string, mode: "prod" | "staging"):
 
 > webgpu game engine. fast by default, instant iteration, runs where webgpu does.
 
-The source is the reference: every public export carries a JSDoc contract, and there is no docs site to drift from it. Two files carry the consumer surface. Read the first before writing a project; grep the second for the problem you have.
+The source is the reference: every public export carries a JSDoc contract, and there is no docs site to drift from it. Start with the README; grep the examples index for the problem you have.
 
 ## Read
 
-- [Consumer contract](${raw("AGENTS.md")}): commands, the ECS and plugin conventions, the GPU, render, physics and verify rules. Ships in the npm package as AGENTS.md.
+- [README](${raw("README.md")}): setup, CLI, recipes, live demos and build targets.
 - [Examples index](${raw("examples/AGENTS.md")}): one line per recipe and showcase project, with the concept each teaches.
-- [README](${raw("README.md")}): quick start, live demos, building from source.
 
 ## Start
 
