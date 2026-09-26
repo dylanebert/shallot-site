@@ -61,11 +61,19 @@ check(
     "RUM init — local previews and unapproved hosts never load the SDK",
     { claim: "no local or ordinary preview initializes/transmits RUM by default" },
     () => {
-        for (const [mode, hostname, protocol] of [
-            ["prod", "localhost", "http:"],
-            ["prod", "192.168.1.8", "http:"],
-            ["staging", "preview.example.test", "https:"],
-            ["staging", "localhost", "http:"],
+        for (const [mode, hostname, protocol, search] of [
+            ["prod", "localhost", "http:", ""],
+            ["prod", "192.168.1.8", "http:", ""],
+            ["staging", "preview.example.test", "https:", "?rum_run=r&rum_case=clean"],
+            ["staging", "localhost", "http:", "?rum_run=r&rum_case=error"],
+            ["staging", "shallot-staging.pages.dev", "https:", ""],
+            ["staging", "shallot-staging.pages.dev", "https:", "?rum_run=bad!&rum_case=error"],
+            [
+                "staging",
+                "shallot-staging.pages.dev",
+                "https:",
+                "?rum_run=r&rum_case=clean&rum_case=error",
+            ],
         ] as const) {
             const source = datadogInitSnippet(mode).match(/<script>([\s\S]*?)<\/script>/)?.[1];
             expect(source).toBeDefined();
@@ -81,13 +89,14 @@ check(
                 new Function("window", "document", "location", source!)({}, document, {
                     hostname,
                     protocol,
+                    search,
                 }),
             ).not.toThrow();
         }
-        for (const [mode, hostname] of [
-            ["prod", "dylanebert.com"],
-            ["prod", "sub.dylanebert.com"],
-            ["staging", "main.shallot-staging.pages.dev"],
+        for (const [mode, hostname, search] of [
+            ["prod", "dylanebert.com", ""],
+            ["prod", "sub.dylanebert.com", ""],
+            ["staging", "shallot-staging.pages.dev", "?rum_run=case-1&rum_case=clean"],
         ] as const) {
             let loaded = false;
             const document = {
@@ -112,6 +121,7 @@ check(
             new Function("window", "document", "location", source)({}, document, {
                 hostname,
                 protocol: "https:",
+                search,
             });
             expect(loaded).toBe(true);
         }

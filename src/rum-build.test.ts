@@ -45,12 +45,15 @@ check(
             expect(plan).toEqual({
                 service: "shallot-site",
                 version: "build-123",
-                minifiedPathPrefix: "https://main.shallot-staging.pages.dev/first-person/assets/",
+                minifiedPathPrefix: "https://shallot-staging.pages.dev/first-person/assets/",
                 mapFiles: ["rum.js.map"],
             });
             expect(formatSourceMapUploadCommand("out/site/first-person/assets", plan)).toBe(
-                'datadog-ci sourcemaps upload "out/site/first-person/assets" --service "shallot-site" --release-version "build-123" --minified-path-prefix "https://main.shallot-staging.pages.dev/first-person/assets/"',
+                'datadog-ci sourcemaps upload "out/site/first-person/assets" --service "shallot-site" --release-version "build-123" --minified-path-prefix "https://shallot-staging.pages.dev/first-person/assets/"',
             );
+            expect(() =>
+                sourceMapUploadPlan("first-person", "staging", "build-123", [], "bad.example"),
+            ).toThrow("invalid staging Pages hostname");
             writeFileSync(
                 join(dir, "assets", "rum.js.map"),
                 JSON.stringify({ sourcesContent: [null] }),

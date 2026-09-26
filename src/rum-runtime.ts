@@ -23,6 +23,7 @@ declare global {
                 options: { startTime: number; duration: number; context: Record<string, unknown> },
             ) => void;
             addError?: (error: Error, context?: Record<string, unknown>) => void;
+            addAction?: (name: string, context?: Record<string, unknown>) => void;
         };
     }
 }
@@ -38,19 +39,35 @@ declare const __SHALLOT_RUM_MODE__: "prod" | "staging";
 declare const __SHALLOT_DEMO_SLUG__: string;
 declare const __SHALLOT_BUILD_ID__: string;
 
-// Qualification fixture: only the first-person showcase in an explicitly built staging artifact,
-// and only with a caller-supplied run marker. It executes after SDK initialization; it is not a
-// production fault path or an assertion that Datadog received the event.
+// Qualification observations run only in the first-person staging artifact, with one valid
+// run and case marker. Clean visits report a marked action; error visits report only the fixture.
 if (__SHALLOT_RUM_MODE__ === "staging" && __SHALLOT_DEMO_SLUG__ === "first-person") {
-    const run = new URLSearchParams(location.search).get("rum_run");
-    if (run && /^[a-zA-Z0-9_-]{1,64}$/.test(run)) {
+    const params = new URLSearchParams(location.search);
+    const run = params.get("rum_run");
+    const visit = params.get("rum_case");
+    const marked =
+        run !== null &&
+        /^[a-zA-Z0-9_-]{1,64}$/.test(run) &&
+        params.getAll("rum_run").length === 1 &&
+        (visit === "clean" || visit === "error") &&
+        params.getAll("rum_case").length === 1;
+    if (marked) {
         window.DD_RUM?.onReady(() => {
-            window.DD_RUM?.addError?.(new Error("Shallot synthetic RUM source-map fixture"), {
-                synthetic: true,
+            const context = {
+                synthetic: visit === "error",
                 demo: __SHALLOT_DEMO_SLUG__,
                 rum_run: run,
+                rum_case: visit,
                 application_build: __SHALLOT_BUILD_ID__,
-            });
+            };
+            if (visit === "clean") {
+                window.DD_RUM?.addAction?.("shallot_staging_observation", context);
+            } else {
+                window.DD_RUM?.addError?.(
+                    new Error("Shallot synthetic RUM source-map fixture"),
+                    context,
+                );
+            }
         });
     }
 }

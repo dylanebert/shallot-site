@@ -83,11 +83,12 @@ export function sourceMapUploadPlan(
     mode: "prod" | "staging",
     buildId: string,
     mapFiles: string[],
+    stagingHostname = "shallot-staging.pages.dev",
 ): SourceMapUploadPlan {
-    const base =
-        mode === "prod"
-            ? "https://dylanebert.com/shallot"
-            : "https://main.shallot-staging.pages.dev";
+    if (mode === "staging" && !/^[a-z0-9-]+\.pages\.dev$/.test(stagingHostname)) {
+        throw new Error(`invalid staging Pages hostname: ${stagingHostname}`);
+    }
+    const base = mode === "prod" ? "https://dylanebert.com/shallot" : `https://${stagingHostname}`;
     return {
         service: RUM_CONFIG.service,
         version: buildId,

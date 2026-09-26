@@ -70,7 +70,7 @@ export function datadogInitSnippet(
     const config = { ...RUM_CONFIG, version: buildId };
     return `${RUM_INJECTION_MARKER}
 <script>
-var ddAllowed=${mode === "prod" ? "/(^|\\.)dylanebert\\.com$/.test(location.hostname)" : "location.hostname==='main.shallot-staging.pages.dev'"};
+var ddAllowed=${mode === "prod" ? "/(^|\\.)dylanebert\\.com$/.test(location.hostname)" : "location.hostname==='shallot-staging.pages.dev'&&/^[a-zA-Z0-9_-]{1,64}$/.test(new URLSearchParams(location.search).get('rum_run')||'')&&['clean','error'].includes(new URLSearchParams(location.search).get('rum_case')||'')&&new URLSearchParams(location.search).getAll('rum_run').length===1&&new URLSearchParams(location.search).getAll('rum_case').length===1"};
 if(ddAllowed){
 (function(h,o,u,n,d) {
     h=h[d]=h[d]||{q:[],onReady:function(c){h.q.push(c)}}

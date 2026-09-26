@@ -1,12 +1,7 @@
 import { relative, resolve, sep } from "node:path";
 import { engineCandidate, engineCommit, engineExamples, engineRoot, root } from "../src/engine";
 import { ROSTER } from "../src/roster";
-import {
-    applicationBuildId,
-    formatSourceMapUploadCommand,
-    sourceMapUploadPlan,
-    validateSourceMaps,
-} from "../src/rum-build";
+import { applicationBuildId, sourceMapUploadPlan, validateSourceMaps } from "../src/rum-build";
 import { readStamp, staleDemos } from "../src/site-stamp";
 import {
     assertPinnedCandidateInputs,
@@ -15,6 +10,9 @@ import {
 } from "./build-site-logic";
 
 const outDir = resolve(root, process.argv[2] ?? "out/site");
+const hostname = process.argv[3];
+if (!hostname) throw new Error("pass the checked staging Pages hostname as argument 2");
+if (!process.env.DD_API_KEY) throw new Error("DD_API_KEY is required for source-map upload");
 const stamp = readStamp(outDir);
 if (!stamp) throw new Error(`no valid build stamp at ${outDir}`);
 if (stamp.mode.kind !== "staging")
@@ -50,6 +48,23 @@ if (stale.length > 0)
 for (const slug of Object.keys(stamp.demos).sort()) {
     const assets = resolve(outDir, slug, "assets");
     const mapFiles = validateSourceMaps(assets);
-    const plan = sourceMapUploadPlan(slug, "staging", stamp.buildId, mapFiles);
-    console.log(formatSourceMapUploadCommand(assets, plan));
+    const plan = sourceMapUploadPlan(slug, "staging", stamp.buildId, mapFiles, hostname);
+    const result = Bun.spawnSync(
+        [
+            "bunx",
+            "--no-install",
+            "datadog-ci",
+            "sourcemaps",
+            "upload",
+            assets,
+            "--service",
+            plan.service,
+            "--release-version",
+            plan.version,
+            "--minified-path-prefix",
+            plan.minifiedPathPrefix,
+        ],
+        { cwd: root, env: process.env, stdout: "inherit", stderr: "inherit" },
+    );
+    if (result.exitCode !== 0) throw new Error(`Datadog source-map upload failed for ${slug}`);
 }

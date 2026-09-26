@@ -9,8 +9,8 @@ const workflow = readFileSync(
 );
 
 check(
-    "site-staging — push builds and archives, but cannot deploy",
-    { claim: "only an opted-in manual run with both credentials can deploy staging" },
+    "site-staging — push and unapproved manual runs cannot perform external work",
+    { claim: "only an opted-in manual run with all required credentials reaches staging setup" },
     () => {
         expect(workflow).toMatch(/push:\s*\n\s*branches:\s*\[main\]/);
         expect(workflow).toMatch(
@@ -18,13 +18,23 @@ check(
         );
         expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
         expect(workflow).toContain("inputs.deploy_staging");
-        expect(workflow).toContain("secrets.CLOUDFLARE_API_TOKEN != ''");
-        expect(workflow).toContain("secrets.CLOUDFLARE_ACCOUNT_ID != ''");
-        expect(workflow).toContain(
-            "name: Deploy candidate to Cloudflare Pages\n        if: $" +
-                "{{ env.CF_DEPLOY_READY == 'true' }}",
-        );
-        expect(workflow).toContain("name: site-candidate");
+        for (const name of ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "DD_API_KEY"])
+            expect(workflow).toContain(`secrets.${name} != ''`);
+        for (const title of [
+            "Create or verify named staging project",
+            "Upload source maps for this build",
+            "Deploy the same identified build to Cloudflare Pages",
+        ]) {
+            const start = workflow.indexOf(`name: ${title}`);
+            expect(start).toBeGreaterThanOrEqual(0);
+            expect(workflow.slice(start, workflow.indexOf("\n\n", start))).toContain(
+                "if: $" + "{{ env.CF_DEPLOY_READY == 'true' }}",
+            );
+        }
+        expect(workflow).toContain("bun run build --candidate");
+        expect(workflow).toContain("bun run sourcemaps:prepare -- out/site");
+        expect(workflow).toContain("wrangler pages deploy out/site --project-name=shallot-staging");
         expect(workflow).toContain("path: out/site");
+        expect(workflow).not.toContain("main.shallot-staging.pages.dev");
     },
 );
