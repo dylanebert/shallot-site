@@ -62,10 +62,16 @@ const DATADOG_RUM_CDN_URL = `https://www.datadoghq-browser-agent.com/us1/v${DATA
 // CORS-mode load is exempt from the CORP check entirely — so `crossOrigin` fixes the file-preview failure
 // without needing a header change in the engine package (out of scope) or the deployed site, which never
 // sets COEP (a static host can't set headers, the doc comment above `CROSS_ORIGIN_ISOLATION` already notes).
-export function datadogInitSnippet(mode: "prod" | "staging" = "prod"): string {
+export function datadogInitSnippet(
+    mode: "prod" | "staging" = "prod",
+    buildId = "development",
+): string {
     const envSnippet = mode === "staging" ? RUM_ENV_SNIPPET_STAGING : RUM_ENV_SNIPPET;
+    const config = { ...RUM_CONFIG, version: buildId };
     return `${RUM_INJECTION_MARKER}
 <script>
+var ddAllowed=${mode === "prod" ? "/(^|\\.)dylanebert\\.com$/.test(location.hostname)" : "location.hostname==='main.shallot-staging.pages.dev'"};
+if(ddAllowed){
 (function(h,o,u,n,d) {
     h=h[d]=h[d]||{q:[],onReady:function(c){h.q.push(c)}}
     d=o.createElement(u);d.async=1;d.src=n;d.crossOrigin='anonymous'
@@ -73,8 +79,9 @@ export function datadogInitSnippet(mode: "prod" | "staging" = "prod"): string {
 })(window,document,'script','${DATADOG_RUM_CDN_URL}','DD_RUM')
 window.DD_RUM.onReady(function() {
     ${envSnippet}
-    window.DD_RUM.init(${RUM_ENV_USAGE}${JSON.stringify(RUM_CONFIG)}));
+    window.DD_RUM.init(${RUM_ENV_USAGE}${JSON.stringify(config)}));
 });
+}
 </script>
 `;
 }

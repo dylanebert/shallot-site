@@ -1,9 +1,9 @@
 // Browser-only rAF/SDK glue — drives `rum-sampler.ts`'s and `rum-compile-vitals.ts`'s pure
 // decision logic with real `requestAnimationFrame` timestamps and `PerformanceObserver` entries,
 // reporting through the Datadog RUM CDN snippet's global. Bundled by `scripts/build-site.ts`
-// (`Bun.build`, target "browser") and inlined into every demo page; never imported by anything
-// else, so it has no test of its own — the logic it drives is tested in `rum-sampler.test.ts` and
-// `rum-compile-vitals.test.ts`.
+// (Vite, browser target) as a separate asset; staging builds carry its source map. Its browser
+// boundary is exercised with a missing-SDK runtime test; the logic it drives is tested in
+// `rum-sampler.test.ts` and `rum-compile-vitals.test.ts`.
 
 import { compileVitalReports } from "./rum-compile-vitals";
 import {
@@ -22,6 +22,7 @@ declare global {
                 name: string,
                 options: { startTime: number; duration: number; context: Record<string, unknown> },
             ) => void;
+            addError?: (error: Error, context?: Record<string, unknown>) => void;
         };
     }
 }
@@ -33,6 +34,26 @@ declare global {
 // from it pulls TypeGPU's whole module graph in (measured 0.56 MB / 170 modules for a probe
 // importing only the constant — `rum-compile-vitals.ts`'s own docblock records the same fact).
 declare const __PIPELINE_COMPILE_MEASURE_PREFIX__: string;
+declare const __SHALLOT_RUM_MODE__: "prod" | "staging";
+declare const __SHALLOT_DEMO_SLUG__: string;
+declare const __SHALLOT_BUILD_ID__: string;
+
+// Qualification fixture: only the first-person showcase in an explicitly built staging artifact,
+// and only with a caller-supplied run marker. It executes after SDK initialization; it is not a
+// production fault path or an assertion that Datadog received the event.
+if (__SHALLOT_RUM_MODE__ === "staging" && __SHALLOT_DEMO_SLUG__ === "first-person") {
+    const run = new URLSearchParams(location.search).get("rum_run");
+    if (run && /^[a-zA-Z0-9_-]{1,64}$/.test(run)) {
+        window.DD_RUM?.onReady(() => {
+            window.DD_RUM?.addError?.(new Error("Shallot synthetic RUM source-map fixture"), {
+                synthetic: true,
+                demo: __SHALLOT_DEMO_SLUG__,
+                rum_run: run,
+                application_build: __SHALLOT_BUILD_ID__,
+            });
+        });
+    }
+}
 
 // `PerformanceObserver({ type: "measure", buffered: true })` — `buffered: true` is load-bearing:
 // a compile forced during boot (the sear/slab forcers `precompileAll` warms before the page is

@@ -1,14 +1,19 @@
 # Candidate site proof: build every demo from the qualified Shallot full SHA and install that
-# same immutable Git identity in each ejected consumer. Deployment is optional and only admitted
-# when both Cloudflare credentials are present; local execution never deploys.
+# same immutable Git identity in each ejected consumer. Pushes build and archive only; deployment
+# is restricted to workflow_dispatch with explicit opt-in and both Cloudflare credentials.
 
 name: site-staging
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy_staging:
+        description: Explicitly deploy this candidate to the staging Pages project
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SITE_OUT_REQUIRED: "1"
-      CF_DEPLOY_READY: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' && 'true' || 'false' }}
+      CF_DEPLOY_READY: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_staging && secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
 

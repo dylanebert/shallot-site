@@ -51,6 +51,67 @@ check(
 );
 
 check(
+    "RUM init — local previews and unapproved hosts never load the SDK",
+    { claim: "no local or ordinary preview initializes/transmits RUM by default" },
+    () => {
+        for (const [mode, hostname, protocol] of [
+            ["prod", "localhost", "http:"],
+            ["prod", "192.168.1.8", "http:"],
+            ["staging", "preview.example.test", "https:"],
+            ["staging", "localhost", "http:"],
+        ] as const) {
+            const source = datadogInitSnippet(mode).match(/<script>([\s\S]*?)<\/script>/)?.[1];
+            expect(source).toBeDefined();
+            const document = {
+                createElement() {
+                    throw new Error("SDK must not load on this host");
+                },
+                getElementsByTagName() {
+                    throw new Error("SDK must not load on this host");
+                },
+            };
+            expect(() =>
+                new Function("window", "document", "location", source!)({}, document, {
+                    hostname,
+                    protocol,
+                }),
+            ).not.toThrow();
+        }
+        for (const [mode, hostname] of [
+            ["prod", "dylanebert.com"],
+            ["prod", "sub.dylanebert.com"],
+            ["staging", "main.shallot-staging.pages.dev"],
+        ] as const) {
+            let loaded = false;
+            const document = {
+                createElement() {
+                    return {};
+                },
+                getElementsByTagName() {
+                    return [
+                        {
+                            parentNode: {
+                                insertBefore() {
+                                    loaded = true;
+                                },
+                            },
+                        },
+                    ];
+                },
+            };
+            const match = datadogInitSnippet(mode).match(/<script>([\s\S]*?)<\/script>/);
+            expect(match).not.toBeNull();
+            const source = match?.[1] ?? "";
+            new Function("window", "document", "location", source)({}, document, {
+                hostname,
+                protocol: "https:",
+            });
+            expect(loaded).toBe(true);
+        }
+    },
+);
+
+check(
     "build-site — discovers workspace extensions and rewrites them in both engine modes",
     {
         claim: "ejected site dependencies rewrite the engine and every workspace extension pin",

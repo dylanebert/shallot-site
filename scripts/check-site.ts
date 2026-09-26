@@ -11,6 +11,7 @@ import {
     root,
 } from "../src/engine";
 import { ROSTER } from "../src/roster";
+import { validateSourceMaps } from "../src/rum-build";
 import {
     RUM_ENV_SNIPPET,
     RUM_ENV_SNIPPET_STAGING,
@@ -286,6 +287,42 @@ if (stamp) {
     }
 }
 const mode: "prod" | "staging" = stamp?.mode.kind ?? "prod";
+
+// A staging identity must be the version used by init and its maps must be present, paired,
+// source-bearing artifacts from that same build.
+if (stamp) {
+    const stagingArtifact =
+        mode === "staging" &&
+        existsSync(resolve(outDir, "index.html")) &&
+        readFileSync(resolve(outDir, "index.html"), "utf8").includes(RUM_ENV_SNIPPET_STAGING);
+    const defects: string[] = [];
+    for (const { slug } of ROSTER) {
+        const demoDir = resolve(outDir, slug);
+        if (!existsSync(demoDir)) continue;
+        const html = readFileSync(resolve(demoDir, "index.html"), "utf8");
+        if (!html.includes(`"version":"${stamp.buildId}"`)) {
+            defects.push(`${slug}: RUM version does not match build stamp ${stamp.buildId}`);
+        }
+        if (stagingArtifact) {
+            const runtimeName = `shallot-rum-${stamp.buildId}.js`;
+            if (!html.includes(runtimeName))
+                defects.push(`${slug}: runtime does not name ${runtimeName}`);
+            if (!existsSync(resolve(demoDir, "assets", runtimeName))) {
+                defects.push(`${slug}: missing runtime bundle ${runtimeName}`);
+            }
+            try {
+                const maps = validateSourceMaps(resolve(demoDir, "assets"));
+                if (!maps.some((path) => path === `${runtimeName}.map`)) {
+                    defects.push(`${slug}: missing ${runtimeName}.map`);
+                }
+            } catch (error) {
+                defects.push(`${slug}: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+    }
+    if (defects.length > 0)
+        fail(`✗ staging build identity/source-map defects:\n  ${defects.join("\n  ")}`);
+}
 
 // scan every generated HTML/JS/CSS file for root-absolute paths: `href="/..."` or `src="/..."`
 // HTML attributes. A root-absolute path would break at a non-root base path (GitHub Pages

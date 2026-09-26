@@ -359,7 +359,11 @@ check(
 function modeFixture(mode: "prod" | "staging"): string {
     const out = mkdtempSync(join(tmpdir(), `check-site-fixture-${mode}-`));
     for (const { slug } of ROSTER) {
-        mkdirSync(resolve(out, slug), { recursive: true });
+        mkdirSync(resolve(out, slug, "assets"), { recursive: true });
+        writeFileSync(
+            resolve(out, slug, "assets/shallot-rum-development.js"),
+            "// fixture bundle\\n",
+        );
         writeFileSync(
             resolve(out, slug, "index.html"),
             `<!doctype html>
@@ -370,14 +374,26 @@ function modeFixture(mode: "prod" | "staging"): string {
     </head>
     <body>
         <script type="module" src="./assets/index.js"></script>
-${datadogInitSnippet(mode)}    </body>
+        <script type="module" src="./assets/shallot-rum-development.js"></script>
+${datadogInitSnippet(mode, "development")}    </body>
 </html>
 `,
         );
+        if (mode === "staging") {
+            mkdirSync(resolve(out, slug, "assets"), { recursive: true });
+            writeFileSync(
+                resolve(out, slug, "assets/shallot-rum-development.js"),
+                "// fixture bundle\n",
+            );
+            writeFileSync(
+                resolve(out, slug, "assets/shallot-rum-development.js.map"),
+                JSON.stringify({ sources: ["src/rum-runtime.ts"], sourcesContent: ["// source"] }),
+            );
+        }
     }
     writeFileSync(
         resolve(out, "index.html"),
-        `<!doctype html>\n<html><body>${datadogInitSnippet(mode)}</body></html>\n`,
+        `<!doctype html>\n<html><body>${datadogInitSnippet(mode, "development")}</body></html>\n`,
     );
     return out;
 }
@@ -391,6 +407,7 @@ function stampFresh(fixture: string, mode: SiteMode) {
             repoRoot,
         ),
         mode,
+        "development",
     );
 }
 
@@ -406,6 +423,25 @@ check(
         const fixture = modeFixture("staging");
         try {
             stampFresh(fixture, stagingMode());
+            const page = resolve(fixture, ROSTER[0].slug, "index.html");
+            const pageText = readFileSync(page, "utf8");
+            writeFileSync(
+                page,
+                pageText.replace('"version":"development"', '"version":"wrong-build"'),
+            );
+            const mismatchedIdentity = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
+            expect(mismatchedIdentity.exitCode).toBe(1);
+            expect(mismatchedIdentity.out).toContain("RUM version does not match build stamp");
+            writeFileSync(page, pageText);
+
+            const map = resolve(fixture, ROSTER[0].slug, "assets/shallot-rum-development.js.map");
+            const mapText = readFileSync(map, "utf8");
+            rmSync(map);
+            const missingMap = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
+            expect(missingMap.exitCode).toBe(1);
+            expect(missingMap.out).toContain("source-map defects");
+            expect(missingMap.out).toContain("no JavaScript source maps");
+            writeFileSync(map, mapText);
             const { exitCode, out } = runCheck(fixture, { SITE_OUT_REQUIRED: "1" });
             expect(exitCode).toBe(0);
             expect(out).toContain("✓");

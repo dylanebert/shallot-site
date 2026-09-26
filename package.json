@@ -7,6 +7,7 @@
     "scripts": {
         "engine": "bun run scripts/engine-checkout.ts",
         "build": "bun run scripts/build-site.ts",
+        "sourcemaps:prepare": "bun run scripts/prepare-sourcemaps.ts",
         "pages": "bun run scripts/build-pages.ts",
         "demos": "bun run scripts/demos.ts",
         "candidate": "bun run engine --candidate",
@@ -20,6 +21,7 @@
         "@types/node": "^26.0.0",
         "@types/bun": "latest",
         "playwright": "^1.63.0",
-        "typescript": "^7.0.2"
+        "typescript": "^7.0.2",
+        "vite": "^8.3.0"
     }
 }

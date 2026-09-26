@@ -63,8 +63,10 @@ function isSiteMode(v: unknown): v is SiteMode {
 export interface SiteStamp {
     /** Bumped when the fingerprint recipe below changes: an old stamp then reads stale, which is
      * the correct answer — a fingerprint computed by a different recipe is not comparable. Bumped
-     * 1 → 2 to add `mode`; 2 → 3 to include tracked source from packed workspace extensions. */
-    recipe: 4;
+     * 1 → 2 to add `mode`; 2 → 3 to include tracked extension sources; 4 → 5 adds build identity. */
+    recipe: 5;
+    /** One service/version shared by every page and source-map upload from this build. */
+    buildId: string;
     /** The mode this build ran in, and the engine pin it used — see `SiteMode` above. Overwritten
      * on every write (unlike `demos`, which merges) since a build run has exactly one mode. */
     mode: SiteMode;
@@ -72,13 +74,23 @@ export interface SiteStamp {
     demos: Record<string, string>;
 }
 
-const RECIPE: SiteStamp["recipe"] = 4;
+const RECIPE: SiteStamp["recipe"] = 5;
 
 /** The builder files whose contents reach every built page regardless of demo. */
 const BUILDER_FILES = [
     "scripts/build-site.ts",
+    "scripts/build-pages.ts",
+    "scripts/build-site-logic.ts",
+    "src/home.ts",
+    "src/brand/client.ts",
+    "src/brand/page.ts",
+    "src/brand/theme.ts",
+    "src/brand/png.ts",
     "src/rum-config.ts",
     "src/rum-runtime.ts",
+    "src/rum-build.ts",
+    "scripts/prepare-sourcemaps.ts",
+    "src/site-stamp.ts",
     "src/rum-sampler.ts",
     "src/roster.ts",
 ];
@@ -185,13 +197,19 @@ export function readStamp(outDirPath: string): SiteStamp | null {
         const parsed = JSON.parse(readFileSync(path, "utf8")) as Partial<SiteStamp>;
         if (
             parsed.recipe !== RECIPE ||
+            typeof parsed.buildId !== "string" ||
             typeof parsed.demos !== "object" ||
             parsed.demos === null ||
             !isSiteMode(parsed.mode)
         ) {
             return null;
         }
-        return { recipe: RECIPE, mode: parsed.mode, demos: parsed.demos as Record<string, string> };
+        return {
+            recipe: RECIPE,
+            buildId: parsed.buildId,
+            mode: parsed.mode,
+            demos: parsed.demos as Record<string, string>,
+        };
     } catch {
         return null; // an unparseable stamp is no stamp — the artifact reads stale
     }
@@ -204,10 +222,12 @@ export function writeStamp(
     outDirPath: string,
     entries: Record<string, string>,
     mode: SiteMode,
+    buildId = "development",
 ): void {
     const prior = readStamp(outDirPath);
     const stamp: SiteStamp = {
         recipe: RECIPE,
+        buildId,
         mode,
         demos: { ...(prior?.demos ?? {}), ...entries },
     };

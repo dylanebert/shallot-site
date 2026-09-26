@@ -9,8 +9,9 @@ import {
     writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { Glob } from "bun";
+import { build as viteBuild } from "vite";
 import {
     checkoutTag,
     engineCandidate,
@@ -24,6 +25,7 @@ import {
 } from "../src/engine";
 import { llmsTxt, siteIndex } from "../src/home";
 import { ROSTER } from "../src/roster";
+import { applicationBuildId } from "../src/rum-build";
 import { datadogInitSnippet } from "../src/rum-config";
 import { demoFingerprints, type SiteMode, writeStamp } from "../src/site-stamp";
 import { buildBrand, bundleClient } from "./build-pages";
@@ -55,35 +57,71 @@ const showcaseDir = engineExamples();
 const outDir = resolve(root, "out/site");
 
 /** Bundles `src/rum-runtime.ts` (which imports the pure sampler) to a single browser-target ESM
- * script — inlined so every demo page, at any output depth, carries it with no relative-path
- * plumbing. `define` inlines the compile-measure prefix as the ambient
+ * script with an external map, so the staging fixture's stack resolves to its TypeScript source.
+ * `define` inlines the compile-measure prefix as the ambient
  * `__PIPELINE_COMPILE_MEASURE_PREFIX__` global. */
-async function buildRumRuntimeBundle(): Promise<string> {
-    const result = await Bun.build({
-        entrypoints: [resolve(root, "src/rum-runtime.ts")],
-        target: "browser",
-        minify: false,
+async function buildRumRuntimeBundle(
+    outputPath: string,
+    mode: "prod" | "staging",
+    slug: string,
+    buildId: string,
+): Promise<string> {
+    await viteBuild({
+        configFile: false,
+        root,
+        logLevel: "error",
         define: {
             __PIPELINE_COMPILE_MEASURE_PREFIX__: JSON.stringify(PIPELINE_COMPILE_MEASURE_PREFIX),
+            __SHALLOT_RUM_MODE__: JSON.stringify(mode),
+            __SHALLOT_DEMO_SLUG__: JSON.stringify(slug),
+            __SHALLOT_BUILD_ID__: JSON.stringify(buildId),
+        },
+        build: {
+            outDir: dirname(outputPath),
+            emptyOutDir: false,
+            sourcemap: mode === "staging",
+            rollupOptions: {
+                input: resolve(root, "src/rum-runtime.ts"),
+                output: { entryFileNames: basename(outputPath) },
+            },
         },
     });
-    if (!result.success) {
-        for (const log of result.logs) console.error(log);
-        throw new Error("failed to bundle src/rum-runtime.ts");
+    if (!existsSync(outputPath)) throw new Error("RUM runtime bundle was not emitted");
+    if (mode === "staging") {
+        if (!existsSync(`${outputPath}.map`))
+            throw new Error("RUM runtime source map was not emitted");
+        const parsedMap = JSON.parse(readFileSync(`${outputPath}.map`, "utf8")) as {
+            sources?: string[];
+            sourcesContent?: unknown[];
+        };
+        const runtimeSource = parsedMap.sources?.findIndex((source) =>
+            source.endsWith("src/rum-runtime.ts"),
+        );
+        if (
+            runtimeSource === undefined ||
+            runtimeSource < 0 ||
+            typeof parsedMap.sourcesContent?.[runtimeSource] !== "string"
+        ) {
+            throw new Error("RUM runtime source map does not contain src/rum-runtime.ts");
+        }
     }
-    const output = result.outputs[0];
-    if (!output) throw new Error("src/rum-runtime.ts bundle produced no output");
-    return await output.text();
+    return outputPath;
 }
 
 /** Injects the Datadog init snippet plus the bundled sampler into every `*.html` file under
  * `dir` (recursive — a demo like `visualization` emits nested pages under `demos/`), right
  * before `</body>`. */
-function injectRum(dir: string, runtimeBundle: string, mode: "prod" | "staging"): void {
-    const snippet = `${datadogInitSnippet(mode)}<script type="module">\n${runtimeBundle}</script>\n`;
+function injectRum(
+    dir: string,
+    runtimePath: string,
+    mode: "prod" | "staging",
+    buildId: string,
+): void {
     const glob = new Glob("**/*.html");
     for (const path of glob.scanSync({ cwd: dir })) {
         const full = resolve(dir, path);
+        const runtimeUrl = relative(dirname(full), runtimePath).split(sep).join("/");
+        const snippet = `${datadogInitSnippet(mode, buildId)}<script type="module" src="./${runtimeUrl}"></script>\n`;
         const html = readFileSync(full, "utf8");
         const closeBodyRe = /<\/body>/i;
         if (!closeBodyRe.test(html)) {
@@ -158,7 +196,7 @@ Options:
     }
     mkdirSync(outDir, { recursive: true });
 
-    const rumRuntimeBundle = await buildRumRuntimeBundle();
+    const buildId = applicationBuildId(engineCommit());
 
     // Discover and pack workspace extensions once, before any demo is ejected. Unlike the engine,
     // extensions are packed in both modes because unpublished workspace extensions cannot be
@@ -236,6 +274,20 @@ Options:
 
                 // the in-repo tsconfig extends an engine-root path that doesn't exist outside it
                 writeFileSync(resolve(scratch, "tsconfig.json"), `${standaloneTsconfig()}\n`);
+                if (candidate && slug === "first-person") {
+                    const viteConfig = resolve(scratch, "vite.config.ts");
+                    if (existsSync(viteConfig)) {
+                        throw new Error(
+                            "first-person gained a vite.config.ts; merge the source-map plugin instead of replacing it",
+                        );
+                    }
+                    // The pinned Shallot build loads project Vite plugins for manifest projects.
+                    // A config-hook plugin is necessary because buildWeb intentionally owns build options.
+                    writeFileSync(
+                        viteConfig,
+                        `export default { plugins: [{ name: "shallot-site-sourcemaps", config: () => ({ build: { sourcemap: true } }) }] };\n`,
+                    );
+                }
 
                 console.log(`  installing...`);
                 const install = Bun.spawnSync(["bun", "install"], {
@@ -266,7 +318,11 @@ Options:
                 }
                 const demoOut = resolve(outDir, slug);
                 cpSync(dist, demoOut, { recursive: true });
-                injectRum(demoOut, rumRuntimeBundle, mode);
+                const runtimeDir = resolve(demoOut, "assets");
+                mkdirSync(runtimeDir, { recursive: true });
+                const runtimePath = resolve(runtimeDir, `shallot-rum-${buildId}.js`);
+                await buildRumRuntimeBundle(runtimePath, mode, slug, buildId);
+                injectRum(demoOut, runtimePath, mode, buildId);
 
                 const sizeBytes = dirSize(demoOut);
                 sizes.push({ slug, size: formatSize(sizeBytes) });
@@ -282,7 +338,7 @@ Options:
     // the site's own pages beside the demos: the index (always the full roster, so a `--demo`
     // build's index still lists the others), llms.txt, and /brand/ with its downloads
     const client = await bundleClient();
-    const rum = datadogInitSnippet(mode);
+    const rum = datadogInitSnippet(mode, buildId);
     writeFileSync(
         resolve(outDir, "index.html"),
         siteIndex(ROSTER, version, refShort, mode, client, rum),
@@ -303,7 +359,7 @@ Options:
               root,
           )
         : Object.fromEntries(demos.map((d) => [d.slug, `tag:${engineTag}`]));
-    writeStamp(outDir, fingerprints, siteMode);
+    writeStamp(outDir, fingerprints, siteMode, buildId);
 
     const total = sizes.reduce((sum, s) => sum + parseSize(s.size), 0);
     console.log(`\n=== summary ===`);
