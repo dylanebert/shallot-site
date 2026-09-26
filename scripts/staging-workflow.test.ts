@@ -1,6 +1,7 @@
 import { expect } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { check } from "@dylanebert/shallot/harness/check";
 
 const workflow = readFileSync(
@@ -31,10 +32,44 @@ check(
                 "if: $" + "{{ env.CF_DEPLOY_READY == 'true' }}",
             );
         }
+        expect(workflow).toContain('SITE_OUT_REQUIRED: "1"');
         expect(workflow).toContain("bun run build --candidate");
-        expect(workflow).toContain("bun run sourcemaps:prepare -- out/site");
+        expect(workflow).toContain("bun run sourcemaps:upload -- --upload out/site");
+        expect(workflow).not.toContain("bun run sourcemaps:prepare");
         expect(workflow).toContain("wrangler pages deploy out/site --project-name=shallot-staging");
         expect(workflow).toContain("path: out/site");
+        const archive = workflow.indexOf("name: site-candidate");
+        expect(archive).toBeGreaterThan(workflow.indexOf("bun run scripts/check-site.ts"));
+        expect(workflow.slice(archive, workflow.indexOf("\n\n", archive))).not.toContain("if:");
         expect(workflow).not.toContain("main.shallot-staging.pages.dev");
+    },
+);
+
+check(
+    "site-staging — required artifact check refuses a missing output directory",
+    {
+        claim: "SITE_OUT_REQUIRED on the workflow check makes absent output fail rather than pass",
+        size: "integration",
+        budget: 20_000,
+        subject: "scripts/check-site.ts",
+    },
+    () => {
+        const missingOutput = mkdtempSync(join(tmpdir(), "staging-no-artifact-"));
+        try {
+            const result = Bun.spawnSync([process.execPath, "run", "scripts/check-site.ts"], {
+                cwd: resolve(import.meta.dir, ".."),
+                env: {
+                    ...process.env,
+                    SITE_OUT_DIR: join(missingOutput, "absent"),
+                    SITE_OUT_REQUIRED: "1",
+                },
+                stdout: "pipe",
+                stderr: "pipe",
+            });
+            expect(result.exitCode).toBe(1);
+            expect(result.stderr.toString()).toContain("out/site/ is absent");
+        } finally {
+            rmSync(missingOutput, { recursive: true, force: true });
+        }
     },
 );

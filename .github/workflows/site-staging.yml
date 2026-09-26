@@ -23,6 +23,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
+      SITE_OUT_REQUIRED: "1"
       CF_DEPLOY_READY: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_staging && secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' && secrets.DD_API_KEY != '' && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
@@ -56,7 +57,7 @@ jobs:
         if: ${{ env.CF_DEPLOY_READY == 'true' }}
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
-        run: bun run sourcemaps:prepare -- out/site "${{ steps.pages.outputs.hostname }}"
+        run: bun run sourcemaps:upload -- --upload out/site "${{ steps.pages.outputs.hostname }}"
 
       - name: Deploy the same identified build to Cloudflare Pages
         if: ${{ env.CF_DEPLOY_READY == 'true' }}
