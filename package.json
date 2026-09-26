@@ -10,14 +10,14 @@
         "pages": "bun run scripts/build-pages.ts",
         "demos": "bun run scripts/demos.ts",
         "candidate": "bun run engine --candidate",
-        "list": "shallot list",
-        "workflow": "shallot workflow",
-        "check": "tsc --noEmit && biome check && shallot check",
+        "list": "shallot test --list",
+        "check": "tsc --noEmit && biome check && shallot test --list",
         "test": "shallot test"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.5.13",
-        "@dylanebert/shallot": "github:dylanebert/shallot#0664218f465224397b80aeb604b51178ac71cfb2",
+        "@dylanebert/shallot": "github:dylanebert/shallot#69f12a06438d8ce80aa1ab9e4b34de5b58820e15",
+        "@types/node": "^26.0.0",
         "@types/bun": "latest",
         "playwright": "^1.63.0",
         "typescript": "^7.0.2"

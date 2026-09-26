@@ -1,6 +1,6 @@
 # shallot-site
 
-the demos at [dylanebert.com/shallot](https://dylanebert.com/shallot/), built from the engine's showcase examples.
+the demos at [dylanebert.com/shallot](https://dylanebert.com/shallot/), built from the examples in the engine checkout.
 
 ```bash
 bun install --frozen-lockfile

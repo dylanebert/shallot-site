@@ -1,15 +1,11 @@
-# Production site: builds every showcase demo from the engine checkout at the tag engine.json
-# pins, as an ejected consumer of the published package, and pushes out/site to the gh-pages
-# branch of dylanebert/shallot. That repo's Pages setting serves the branch, which keeps the URL
-# at https://dylanebert.com/shallot/. The push needs SHALLOT_PAGES_TOKEN: a fine-grained PAT
-# with contents: write on dylanebert/shallot.
+# Production site: manually builds the stable release and can publish out/site to the gh-pages
+# branch of dylanebert/shallot. That repo's Pages setting serves the branch at
+# https://dylanebert.com/shallot/. Publishing needs SHALLOT_PAGES_TOKEN: a fine-grained PAT with
+# contents: write on dylanebert/shallot.
 
 name: site
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:

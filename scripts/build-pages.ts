@@ -3,12 +3,11 @@ import { resolve } from "node:path";
 import {
     DARK,
     fromBlocks,
+    type Grid,
     LIGHT,
     lockup,
     MARK,
-    toCells,
     toSvg,
-    toText,
     word,
 } from "@dylanebert/shallot/brand";
 import { brandPage } from "../src/brand/page";
@@ -50,6 +49,28 @@ function framed(grid: ReturnType<typeof fromBlocks>, size: number): ReturnType<t
     );
 }
 
+/** Render the mark as half-block text without the engine's removed text helpers. */
+function halfBlockText(grid: Grid): string {
+    const width = grid[0]?.length ?? 0;
+    const lines: string[] = [];
+    for (let y = 0; y < grid.length; y += 2) {
+        const top = grid[y] ?? [];
+        const bottom = grid[y + 1] ?? [];
+        const line = Array.from({ length: width }, (_, x) => {
+            const upper = top[x];
+            const lower = bottom[x];
+            if (upper && lower) return upper === lower ? "█" : "▀";
+            if (upper) return "▀";
+            if (lower) return "▄";
+            return " ";
+        })
+            .join("")
+            .replace(/\s+$/, "");
+        lines.push(line);
+    }
+    return lines.join("\n");
+}
+
 /** Writes the brand page and every download into `out/brand/`. */
 export async function buildBrand(
     outDir: string,
@@ -73,7 +94,7 @@ export async function buildBrand(
     write("lockup-light.png", toPng(lock, LIGHT, 4, LIGHT.bg));
     write("wordmark.svg", toSvg(word(), DARK, 1));
     write("wordmark.png", toPng(word(), DARK, 8));
-    write("mark.txt", `${toText(toCells(mark))}\n`);
+    write("mark.txt", `${halfBlockText(mark)}\n`);
     const brandModule = Bun.resolveSync("@dylanebert/shallot/brand", root);
     write("mark.ts", readFileSync(brandModule, "utf8"));
 }
