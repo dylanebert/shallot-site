@@ -30,7 +30,13 @@ import { datadogInitSnippet } from "../src/rum-config";
 import { demoFingerprints, type SiteMode, writeStamp } from "../src/site-stamp";
 import { buildBrand, bundleClient } from "./build-pages";
 import type { DemoPackage } from "./build-site-logic";
-import { rewriteSiteDependencies, workspaceExtensionDependencies } from "./build-site-logic";
+import {
+    assertPinnedCandidateInputs,
+    candidateInputScopes,
+    isCandidateBuildInput,
+    rewriteSiteDependencies,
+    workspaceExtensionDependencies,
+} from "./build-site-logic";
 
 export {
     nonWorkspaceShallotDependencies,
@@ -187,6 +193,24 @@ Options:
     }
     const demos = only ? ROSTER.filter((d) => d.slug === only) : ROSTER;
 
+    // Discover extensions before touching output. Candidate builds must use the committed demo
+    // and packed-extension inputs named by the pinned engine SHA, never a mutable checkout view.
+    const extensionNames = new Set<string>();
+    for (const demo of demos) {
+        const demoPkg = (await Bun.file(
+            resolve(showcaseDir, demo.slug, "package.json"),
+        ).json()) as DemoPackage;
+        for (const name of workspaceExtensionDependencies(demoPkg)) extensionNames.add(name);
+    }
+    if (candidate) {
+        const showcasePrefix = `${relative(engineRoot, showcaseDir).split(sep).join("/")}/`;
+        assertPinnedCandidateInputs(
+            engineRoot,
+            engineCandidate,
+            candidateInputScopes(showcasePrefix, extensionNames),
+        );
+    }
+
     // clean + recreate the output dir — a single-demo build only clears that demo's slot,
     // so a prior full build's other demos survive
     if (only) {
@@ -198,17 +222,8 @@ Options:
 
     const buildId = applicationBuildId(engineCommit());
 
-    // Discover and pack workspace extensions once, before any demo is ejected. Unlike the engine,
-    // extensions are packed in both modes because unpublished workspace extensions cannot be
+    // Workspace extensions are packed in both modes because unpublished packages cannot be
     // installed by an outside consumer.
-    const extensionNames = new Set<string>();
-    for (const demo of demos) {
-        const demoPkg = (await Bun.file(
-            resolve(showcaseDir, demo.slug, "package.json"),
-        ).json()) as DemoPackage;
-        for (const name of workspaceExtensionDependencies(demoPkg)) extensionNames.add(name);
-    }
-
     let enginePin = version;
     const packDest = mkdtempSync(join(tmpdir(), "shallot-site-pack-"));
     const extensionPins = new Map<string, string>();
@@ -252,15 +267,9 @@ Options:
             try {
                 console.log(`\n=== ${slug} ===`);
 
-                const nodeModulesDir = resolve(srcDir, "node_modules");
-                const distDir = resolve(srcDir, "dist");
                 cpSync(srcDir, scratch, {
                     recursive: true,
-                    filter: (s) =>
-                        s !== nodeModulesDir &&
-                        !s.startsWith(nodeModulesDir + sep) &&
-                        s !== distDir &&
-                        !s.startsWith(distDir + sep),
+                    filter: (path) => isCandidateBuildInput(relative(srcDir, path), "demo"),
                 });
 
                 const demoPkg = (await Bun.file(
