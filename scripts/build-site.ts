@@ -33,7 +33,7 @@ import type { DemoPackage } from "./build-site-logic";
 import {
     assertPinnedCandidateInputs,
     candidateInputScopes,
-    isCandidateBuildInput,
+    isDemoCopyInput,
     rewriteSiteDependencies,
     workspaceExtensionDependencies,
 } from "./build-site-logic";
@@ -269,7 +269,7 @@ Options:
 
                 cpSync(srcDir, scratch, {
                     recursive: true,
-                    filter: (path) => isCandidateBuildInput(relative(srcDir, path), "demo"),
+                    filter: (path) => isDemoCopyInput(relative(srcDir, path)),
                 });
 
                 const demoPkg = (await Bun.file(

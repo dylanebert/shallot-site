@@ -13,8 +13,9 @@ export type CandidateInputScope = {
     demoDirectories?: boolean;
 };
 
-const GENERATED_DIRS = new Set(["node_modules", ".git", ".cache", ".artifacts", "target"]);
-const GENERATED_FILES = new Set([".DS_Store", "Thumbs.db"]);
+const DEMO_COPY_EXCLUDED_DIRS = new Set(["node_modules", ".git", ".cache", ".artifacts", "target"]);
+const DEMO_COPY_EXCLUDED_FILES = new Set([".DS_Store", "Thumbs.db"]);
+const BUN_PACK_EXCLUDED_DIRS = new Set(["node_modules", ".git"]);
 
 export function candidateInputScopes(
     showcasePrefix: string,
@@ -29,23 +30,36 @@ export function candidateInputScopes(
     ];
 }
 
-/** Whether the relative path is content the site build copies or packs from the candidate checkout. */
-export function isCandidateBuildInput(
-    path: string,
-    kind: CandidateInputScope["kind"],
-    demoDirectories = false,
-): boolean {
+/** The candidate demo copy uses these exact exclusions for both validation and copying. */
+export function isDemoCopyInput(path: string, demoDirectories = false): boolean {
     const parts = path.split(/[\\/]/).filter(Boolean);
-    if (parts.some((part) => GENERATED_DIRS.has(part)) || GENERATED_FILES.has(parts.at(-1) ?? "")) {
+    if (
+        parts.some((part) => DEMO_COPY_EXCLUDED_DIRS.has(part)) ||
+        DEMO_COPY_EXCLUDED_FILES.has(parts.at(-1) ?? "")
+    ) {
         return false;
     }
     if (parts.at(-1)?.endsWith(".tsbuildinfo")) return false;
-    // Demo copies explicitly omit these root build outputs; extension packs may include dist/.
-    if (kind === "demo") {
-        const demoPathOffset = demoDirectories ? 1 : 0;
-        if (["dist", "build"].includes(parts[demoPathOffset] ?? "")) return false;
-    }
+    const demoPathOffset = demoDirectories ? 1 : 0;
+    if (["dist", "build"].includes(parts[demoPathOffset] ?? "")) return false;
     return true;
+}
+
+/**
+ * Conservatively guard every extension path except dependency and VCS subtrees. This deliberately
+ * avoids mirroring Bun's packlist: generated-looking outputs and pack-control files stay in scope.
+ */
+export function isExtensionPackInput(path: string): boolean {
+    return !path
+        .split(/[\\/]/)
+        .filter(Boolean)
+        .some((part) => BUN_PACK_EXCLUDED_DIRS.has(part));
+}
+
+function isScopeInput(path: string, scope: CandidateInputScope): boolean {
+    return scope.kind === "demo"
+        ? isDemoCopyInput(path, scope.demoDirectories)
+        : isExtensionPackInput(path);
 }
 
 function listFiles(
@@ -61,7 +75,7 @@ function listFiles(
             const rel = relative(root, full).split(sep).join("/");
             if (
                 (scope.demoDirectories && !demoSlugs.has(rel.split("/")[0] ?? "")) ||
-                !isCandidateBuildInput(rel, scope.kind, scope.demoDirectories)
+                !isScopeInput(rel, scope)
             )
                 continue;
             if (entry.isDirectory()) walk(full);
@@ -73,7 +87,7 @@ function listFiles(
 }
 
 /** Refuse candidate inputs that differ from HEAD. Checks tracked edits/deletions and untracked or
- * ignored files under the same demo-copy and extension-pack scopes; generated dependencies are out. */
+ * ignored files under the demo-copy and extension-pack scopes, with each tool's own exclusions. */
 export function candidateInputChanges(engineRoot: string, scopes: CandidateInputScope[]): string[] {
     if (scopes.length === 0) return [];
     const prefixes = scopes.map(({ prefix }) => prefix);
@@ -116,7 +130,7 @@ export function candidateInputChanges(engineRoot: string, scopes: CandidateInput
                 scope.demoDirectories &&
                 !demoSlugs.has(inScope.split("/")[0] ?? "")
             ) &&
-            isCandidateBuildInput(inScope, scope.kind, scope.demoDirectories)
+            isScopeInput(inScope, scope)
         ) {
             changed.add(path);
         }
@@ -138,7 +152,7 @@ export function candidateInputChanges(engineRoot: string, scopes: CandidateInput
                     scope.demoDirectories &&
                     !demoSlugs.has(inScope.split("/")[0] ?? "")
                 ) &&
-                isCandidateBuildInput(inScope, scope.kind, scope.demoDirectories)
+                isScopeInput(inScope, scope)
             ) {
                 changed.add(path);
             }

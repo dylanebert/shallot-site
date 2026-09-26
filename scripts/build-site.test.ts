@@ -3,7 +3,7 @@
 // mode/dependency guards that can run against authored inputs.
 
 import { expect } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { check } from "@dylanebert/shallot/harness/check";
@@ -11,7 +11,9 @@ import { llmsTxt } from "../src/home";
 import { datadogInitSnippet, RUM_ENV_SNIPPET, RUM_ENV_SNIPPET_STAGING } from "../src/rum-config";
 import {
     assertPinnedCandidateInputs,
+    candidateInputChanges,
     candidateInputScopes,
+    isDemoCopyInput,
     rewriteSiteDependencies,
     shallotDependencies,
     workspaceExtensionDependencies,
@@ -153,7 +155,12 @@ check(
 
 check(
     "candidate build inputs — accepts clean pinned sources and refuses dirty copied or packed sources",
-    { claim: "clean pinned inputs pass; copied or packed edits, deletions, and additions refuse" },
+    {
+        claim: "clean pinned inputs pass; copied or packed edits, deletions, and additions refuse",
+        size: "integration",
+        budget: 20_000,
+        subject: "scripts/build-site-logic.ts",
+    },
     () => {
         const repo = mkdtempSync(join(tmpdir(), "candidate-inputs-"));
         const run = (...args: string[]) => {
@@ -258,6 +265,84 @@ check(
             expect(() => assertPinnedCandidateInputs(repo, pinnedSha, scopes)).toThrow(
                 "examples/showcase/new-demo/src/index.ts",
             );
+        } finally {
+            rmSync(repo, { recursive: true, force: true });
+        }
+    },
+);
+
+check(
+    "bun pm pack includes generated-looking extension files; candidate guard refuses packed content",
+    {
+        claim: "Bun-packed extension outputs must not escape the pinned candidate boundary",
+        size: "integration",
+        budget: 20_000,
+        subject: ["scripts/build-site.ts", "scripts/build-site-logic.ts"],
+    },
+    () => {
+        const repo = mkdtempSync(join(tmpdir(), "candidate-pack-inputs-"));
+        const packageDir = resolve(repo, "packages/ext");
+        const packDir = resolve(repo, "pack-output");
+        const run = (args: string[], cwd: string) => {
+            const result = Bun.spawnSync(args, { cwd });
+            if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+            return result.stdout.toString();
+        };
+        try {
+            mkdirSync(resolve(packageDir, "src"), { recursive: true });
+            mkdirSync(packDir, { recursive: true });
+            writeFileSync(
+                resolve(packageDir, "package.json"),
+                JSON.stringify({ name: "@example/ext", version: "1.0.0" }),
+            );
+            writeFileSync(resolve(packageDir, "src/index.js"), "export const value = 1;\n");
+            run(["git", "init", "-q"], repo);
+            run(["git", "config", "user.email", "test@example.invalid"], repo);
+            run(["git", "config", "user.name", "Pack input test"], repo);
+            run(["git", "add", "-A"], repo);
+            run(["git", "commit", "-qm", "pinned package"], repo);
+
+            const packedInputs = [
+                ".cache/payload.js",
+                ".artifacts/generated.js",
+                "target/output.js",
+                "dist/output.js",
+                "build/output.js",
+                "src/app.tsbuildinfo",
+            ];
+            for (const path of packedInputs) {
+                const full = resolve(packageDir, path);
+                mkdirSync(resolve(full, ".."), { recursive: true });
+                writeFileSync(full, "generated or source-bearing package content\n");
+            }
+            const dependency = resolve(packageDir, "node_modules/pkg/index.js");
+            mkdirSync(resolve(dependency, ".."), { recursive: true });
+            writeFileSync(dependency, "dependency\n");
+            const vcsFile = resolve(packageDir, ".git/config");
+            mkdirSync(resolve(vcsFile, ".."), { recursive: true });
+            writeFileSync(vcsFile, "local VCS metadata\n");
+
+            // 6e8819b applied the shared generated-path exclusions to extensions too, so this
+            // predicate returned false for .cache. Ask Bun what the package contains, then check
+            // the corrected conservative extension boundary against the same fixture.
+            expect(isDemoCopyInput(".cache/payload.js")).toBe(false);
+            const pinnedSha = run(["git", "rev-parse", "HEAD"], repo).trim();
+            const scope = [{ kind: "extension" as const, prefix: "packages/ext/" }];
+            const changes = candidateInputChanges(repo, scope);
+            for (const path of packedInputs) expect(changes).toContain(`packages/ext/${path}`);
+            expect(changes).not.toContain("packages/ext/node_modules/pkg/index.js");
+            expect(changes).not.toContain("packages/ext/.git/config");
+            expect(() => assertPinnedCandidateInputs(repo, pinnedSha, scope)).toThrow(
+                "packages/ext/.cache/payload.js",
+            );
+
+            run(["bun", "pm", "pack", "--destination", packDir], packageDir);
+            const tarball = readdirSync(packDir).find((path) => path.endsWith(".tgz"));
+            expect(tarball).toBeDefined();
+            const members = run(["tar", "-tzf", resolve(packDir, tarball!)], repo).split("\n");
+            for (const path of packedInputs) expect(members).toContain(`package/${path}`);
+            expect(members).not.toContain("package/node_modules/pkg/index.js");
+            expect(members).not.toContain("package/.git/config");
         } finally {
             rmSync(repo, { recursive: true, force: true });
         }
