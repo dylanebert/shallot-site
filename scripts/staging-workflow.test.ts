@@ -21,6 +21,8 @@ check(
         expect(workflow).toContain("inputs.deploy_staging");
         for (const name of ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "DD_API_KEY"])
             expect(workflow).toContain(`secrets.${name} != ''`);
+        expect(workflow).toMatch(/DATADOG_API_KEY: \$\{\{ secrets\.DD_API_KEY \}\}/);
+        expect(workflow).not.toMatch(/^\s+DD_API_KEY:/m);
         for (const title of [
             "Create or verify named staging project",
             "Upload source maps for this build",

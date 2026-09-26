@@ -14,7 +14,7 @@ export function uploadSourceMaps(
     env: NodeJS.ProcessEnv = process.env,
 ): void {
     if (!explicitlyOptedIn) throw new Error("source-map upload requires explicit --upload opt-in");
-    if (!env.DD_API_KEY) throw new Error("DD_API_KEY is required for source-map upload");
+    if (!env.DATADOG_API_KEY) throw new Error("DATADOG_API_KEY is required for source-map upload");
     for (const { assets, plan } of prepared) {
         const exitCode = invoke(
             [

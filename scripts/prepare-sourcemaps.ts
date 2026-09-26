@@ -20,41 +20,51 @@ export interface PreparedSourceMaps {
     plan: SourceMapUploadPlan;
 }
 
+/** Injectable checkout identities keep preparation tests hermetic; production uses pinned defaults. */
+export interface SourceMapPreparationContext {
+    engineRoot: string;
+    engineExamples: string;
+    engineCandidate: string;
+    engineCommit: string;
+    slugs: string[];
+}
+
 /** Validate one stamped candidate artifact and produce its upload plans without external effects. */
 export async function prepareSourceMaps(
     artifactDir = resolve(root, "out/site"),
     hostname = "shallot-staging.pages.dev",
+    context: Partial<SourceMapPreparationContext> = {},
 ): Promise<PreparedSourceMaps[]> {
+    const checkout = context.engineRoot ?? engineRoot;
+    const examples = context.engineExamples ?? engineExamples();
+    const candidate = context.engineCandidate ?? engineCandidate;
+    const commit = context.engineCommit ?? engineCommit();
+    const slugs = context.slugs ?? ROSTER.map(({ slug }) => slug);
     const outDir = resolve(artifactDir);
     const stamp = readStamp(outDir);
     if (!stamp) throw new Error(`no valid build stamp at ${outDir}`);
     if (stamp.mode.kind !== "staging")
         throw new Error("source-map preparation requires a staging artifact");
-    if (stamp.mode.commit !== engineCandidate || engineCommit() !== engineCandidate) {
+    if (stamp.mode.commit !== candidate || commit !== candidate) {
         throw new Error("staging artifact does not name the pinned engine candidate");
     }
     const extensionNames = new Set<string>();
-    for (const { slug } of ROSTER) {
-        const pkg = (await Bun.file(resolve(engineExamples(), slug, "package.json")).json()) as {
+    for (const slug of slugs) {
+        const pkg = (await Bun.file(resolve(examples, slug, "package.json")).json()) as {
             dependencies?: Record<string, string>;
         };
         for (const name of workspaceExtensionDependencies(pkg)) extensionNames.add(name);
     }
-    const showcasePrefix = `${relative(engineRoot, engineExamples()).split(sep).join("/")}/`;
+    const showcasePrefix = `${relative(checkout, examples).split(sep).join("/")}/`;
     assertPinnedCandidateInputs(
-        engineRoot,
-        engineCandidate,
+        checkout,
+        candidate,
         candidateInputScopes(showcasePrefix, extensionNames),
     );
-    if (stamp.buildId !== applicationBuildId(engineCommit())) {
+    if (stamp.buildId !== applicationBuildId(commit)) {
         throw new Error("build stamp version does not match the current site and engine inputs");
     }
-    const stale = staleDemos(
-        engineRoot,
-        outDir,
-        ROSTER.map(({ slug }) => slug),
-        root,
-    );
+    const stale = staleDemos(checkout, outDir, slugs, root);
     if (stale.length > 0)
         throw new Error(`refusing stale source maps: ${stale.map(({ slug }) => slug).join(", ")}`);
 
