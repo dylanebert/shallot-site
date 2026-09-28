@@ -1,5 +1,4 @@
-import { relative, resolve, sep } from "node:path";
-import { engineCandidate, engineCommit, engineExamples, engineRoot, root } from "../src/engine";
+import { resolve } from "node:path";
 import { ROSTER } from "../src/roster";
 import {
     applicationBuildId,
@@ -8,65 +7,44 @@ import {
     sourceMapUploadPlan,
     validateSourceMaps,
 } from "../src/rum-build";
+import { root, shallotExamples, shallotVersion } from "../src/site";
 import { readStamp, staleDemos } from "../src/site-stamp";
-import {
-    assertPinnedCandidateInputs,
-    candidateInputScopes,
-    workspaceExtensionDependencies,
-} from "./build-site-logic";
 
 export interface PreparedSourceMaps {
     assets: string;
     plan: SourceMapUploadPlan;
 }
 
-/** Injectable checkout identities keep preparation tests hermetic; production uses pinned defaults. */
 export interface SourceMapPreparationContext {
-    engineRoot: string;
-    engineExamples: string;
-    engineCandidate: string;
-    engineCommit: string;
+    examplesRoot: string;
+    version: string;
     slugs: string[];
 }
 
-/** Validate one stamped candidate artifact and produce its upload plans without external effects. */
+/** Validate a stamped staging artifact and produce upload plans without external effects. */
 export async function prepareSourceMaps(
     artifactDir = resolve(root, "out/site"),
     hostname = "shallot-staging.pages.dev",
     context: Partial<SourceMapPreparationContext> = {},
 ): Promise<PreparedSourceMaps[]> {
-    const checkout = context.engineRoot ?? engineRoot;
-    const examples = context.engineExamples ?? engineExamples();
-    const candidate = context.engineCandidate ?? engineCandidate;
-    const commit = context.engineCommit ?? engineCommit();
+    const examples = context.examplesRoot ?? shallotExamples;
+    const version = context.version ?? shallotVersion;
     const slugs = context.slugs ?? ROSTER.map(({ slug }) => slug);
     const outDir = resolve(artifactDir);
     const stamp = readStamp(outDir);
     if (!stamp) throw new Error(`no valid build stamp at ${outDir}`);
     if (stamp.mode.kind !== "staging")
         throw new Error("source-map preparation requires a staging artifact");
-    if (stamp.mode.commit !== candidate || commit !== candidate) {
-        throw new Error("staging artifact does not name the pinned engine candidate");
+    if (stamp.mode.version !== version) {
+        throw new Error(`staging artifact uses Shallot ${stamp.mode.version}, expected ${version}`);
     }
-    const extensionNames = new Set<string>();
-    for (const slug of slugs) {
-        const pkg = (await Bun.file(resolve(examples, slug, "package.json")).json()) as {
-            dependencies?: Record<string, string>;
-        };
-        for (const name of workspaceExtensionDependencies(pkg)) extensionNames.add(name);
+    if (stamp.buildId !== applicationBuildId(version)) {
+        throw new Error("build stamp does not match the current site inputs and installed package");
     }
-    const showcasePrefix = `${relative(checkout, examples).split(sep).join("/")}/`;
-    assertPinnedCandidateInputs(
-        checkout,
-        candidate,
-        candidateInputScopes(showcasePrefix, extensionNames),
-    );
-    if (stamp.buildId !== applicationBuildId(commit)) {
-        throw new Error("build stamp version does not match the current site and engine inputs");
-    }
-    const stale = staleDemos(checkout, outDir, slugs, root);
-    if (stale.length > 0)
+    const stale = staleDemos(examples, outDir, slugs, root);
+    if (stale.length > 0) {
         throw new Error(`refusing stale source maps: ${stale.map(({ slug }) => slug).join(", ")}`);
+    }
 
     return Object.keys(stamp.demos)
         .sort()

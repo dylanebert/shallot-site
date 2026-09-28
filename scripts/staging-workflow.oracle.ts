@@ -31,12 +31,12 @@ test("only an opted-in manual run with all required credentials reaches staging 
         );
     }
     expect(workflow).toContain('SITE_OUT_REQUIRED: "1"');
-    expect(workflow).toContain("bun run build --candidate");
+    expect(workflow).toContain("bun run build --staging");
     expect(workflow).toContain("bun run sourcemaps:upload -- --upload out/site");
     expect(workflow).not.toContain("bun run sourcemaps:prepare");
     expect(workflow).toContain("wrangler pages deploy out/site --project-name=shallot-staging");
     expect(workflow).toContain("path: out/site");
-    const archive = workflow.indexOf("name: site-candidate");
+    const archive = workflow.indexOf("          name: site-staging");
     expect(archive).toBeGreaterThan(workflow.indexOf("bun run scripts/check-site.ts"));
     expect(workflow.slice(archive, workflow.indexOf("\n\n", archive))).not.toContain("if:");
     expect(workflow).not.toContain("main.shallot-staging.pages.dev");

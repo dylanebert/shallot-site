@@ -12,16 +12,14 @@ import type { DemoEntry } from "./roster";
 export function siteIndex(
     demos: DemoEntry[],
     version: string,
-    ref: string,
     mode: "prod" | "staging",
     clientScript: string = "",
     rum: string = "",
 ): string {
-    // staging labels by ref, never by version tag — a staging build routinely runs ahead of the
-    // last release, so `v${version}` may name a GitHub tag that doesn't exist yet.
-    const examplesPath = mode === "staging" ? "examples" : "examples/showcase";
+    // The installed package version is the site's Shallot identity in both production and staging.
+    const at = `v${version}`;
     const codeUrl = (slug: string) =>
-        `https://github.com/dylanebert/shallot/tree/${mode === "staging" ? ref : `v${version}`}/${examplesPath}/${slug}`;
+        `https://github.com/dylanebert/shallot/tree/${at}/examples/${slug}`;
     const rows = demos
         .map(
             (d) =>
@@ -30,12 +28,8 @@ export function siteIndex(
         .join("\n");
     const out = (href: string, text: string) =>
         `<a href="${href}" target="_blank" rel="noopener">${text}</a>`;
-    const commit = out(`https://github.com/dylanebert/shallot/commit/${ref}`, ref);
-    const label =
-        mode === "staging"
-            ? `staging · ${commit}`
-            : `${out(`https://github.com/dylanebert/shallot/releases/tag/v${version}`, `v${version}`)} · ${commit}`;
-    const at = mode === "staging" ? ref : `v${version}`;
+    const release = out(`https://github.com/dylanebert/shallot/releases/tag/${at}`, at);
+    const label = mode === "staging" ? `staging · ${release}` : release;
     const links = [
         `<a href="./brand/">brand</a>`,
         `<a href="./llms.txt">llms.txt</a>`,
@@ -114,10 +108,10 @@ ${rum}</body>
 
 /**
  * `/llms.txt`, the plain-text entry for agents: what shallot is and the raw files to read, pinned to
- * the built version (staging: the built ref). Nothing here is rendered; the docs live in the repo.
+ * the installed package version. Nothing here is rendered; the docs live in the repo.
  */
-export function llmsTxt(version: string, ref: string, mode: "prod" | "staging"): string {
-    const at = mode === "staging" ? ref : `v${version}`;
+export function llmsTxt(version: string): string {
+    const at = `v${version}`;
     const raw = (path: string) =>
         `https://raw.githubusercontent.com/dylanebert/shallot/${at}/${path}`;
     return `# shallot

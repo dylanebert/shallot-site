@@ -12,16 +12,15 @@ import {
 } from "@dylanebert/shallot/brand";
 import { brandPage } from "../src/brand/page";
 import { toPng } from "../src/brand/png";
-import { engineRef, engineVersion, root } from "../src/engine";
 import { llmsTxt, siteIndex } from "../src/home";
 import { ROSTER } from "../src/roster";
 import { datadogInitSnippet } from "../src/rum-config";
+import { root, shallotVersion } from "../src/site";
 
 // `bun run pages` — the site's own pages without the demos: out/site/index.html, llms.txt and
 // out/site/brand/ with its downloads. `build-site.ts` calls the same function after the demo
 // loop, so this is also how to iterate on the pages locally without a demo build. Run alone it
-// builds in staging mode: every link and label names the engine checkout's commit. Production
-// labels come from `bun run build`, which pins to the published version.
+// builds in staging mode; links and labels still identify the installed Shallot package version.
 
 export async function bundleClient(): Promise<string> {
     const result = await Bun.build({
@@ -105,26 +104,21 @@ export async function buildBrand(
 export async function buildPages(
     outDir: string,
     version: string,
-    ref: string,
     mode: "prod" | "staging",
     rumMode: "prod" | "staging" = mode,
 ): Promise<void> {
     mkdirSync(outDir, { recursive: true });
     const client = await bundleClient();
     const rum = datadogInitSnippet(rumMode);
-    writeFileSync(
-        resolve(outDir, "index.html"),
-        siteIndex(ROSTER, version, ref, mode, client, rum),
-    );
-    writeFileSync(resolve(outDir, "llms.txt"), llmsTxt(version, ref, mode));
+    writeFileSync(resolve(outDir, "index.html"), siteIndex(ROSTER, version, mode, client, rum));
+    writeFileSync(resolve(outDir, "llms.txt"), llmsTxt(version));
     await buildBrand(outDir, client, rum);
 }
 
 if (import.meta.main) {
-    const refShort = engineRef();
     const outDir = resolve(root, "out/site");
-    await buildPages(outDir, engineVersion, refShort, "staging", "prod");
+    await buildPages(outDir, shallotVersion, "staging", "prod");
     console.log(
-        `pages (staging · ${refShort}): ${outDir}/index.html, ${outDir}/llms.txt, ${outDir}/brand/`,
+        `pages (staging · Shallot ${shallotVersion}): ${outDir}/index.html, ${outDir}/llms.txt, ${outDir}/brand/`,
     );
 }

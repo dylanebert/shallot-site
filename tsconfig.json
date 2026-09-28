@@ -16,5 +16,5 @@
         "types": ["@webgpu/types", "bun", "node", "vite/client"]
     },
     "include": ["src", "scripts"],
-    "exclude": [".engine", "out", "node_modules"]
+    "exclude": ["out", "node_modules"]
 }

@@ -3,62 +3,37 @@ import {
     existsSync,
     mkdirSync,
     mkdtempSync,
-    readdirSync,
     readFileSync,
+    realpathSync,
     rmSync,
+    symlinkSync,
     writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { Glob } from "bun";
 import { build as viteBuild } from "vite";
-import {
-    checkoutTag,
-    engineCandidate,
-    engineCommit,
-    engineExamples,
-    engineRef,
-    engineRoot,
-    engineTag,
-    engineVersion,
-    root,
-} from "../src/engine";
 import { llmsTxt, siteIndex } from "../src/home";
 import { ROSTER } from "../src/roster";
 import { applicationBuildId } from "../src/rum-build";
 import { datadogInitSnippet } from "../src/rum-config";
-import { demoFingerprints, type SiteMode, writeStamp } from "../src/site-stamp";
+import { root, shallotExamples, shallotPackage, shallotVersion } from "../src/site";
+import { demoFingerprints, writeStamp } from "../src/site-stamp";
 import { buildBrand, bundleClient } from "./build-pages";
-import type { DemoPackage } from "./build-site-logic";
-import {
-    assertPinnedCandidateInputs,
-    candidateInputScopes,
-    isDemoCopyInput,
-    rewriteSiteDependencies,
-    workspaceExtensionDependencies,
-} from "./build-site-logic";
-
-export {
-    nonWorkspaceShallotDependencies,
-    rewriteSiteDependencies,
-    shallotDependencies,
-    workspaceExtensionDependencies,
-} from "./build-site-logic";
 
 // the RUM init snippet lives in `src/rum-config.ts` so the pages build can inject it too;
 // re-exported here because the site tests import it from this module
 export { datadogInitSnippet };
 
-// `bun run build` builds every showcase demo from the stable engine tag as an ejected consumer
-// of the published package. `--candidate` uses the same pipeline against the qualified full-SHA
-// Git candidate for unreleased proof. Each demo is copied to /tmp, its Shallot dependency is
-// rewritten to the selected immutable identity, then its own Vite config builds the artifact.
+// `bun run build` ejects every example from the Shallot package installed by this site. `--staging`
+// changes only the RUM environment and source-map output; each demo uses the same installed package
+// path the site itself resolves, including a staged package overlay or a live link.
 
 /** the literal `PIPELINE_COMPILE_MEASURE_PREFIX` in the engine's `src/engine/runtime/gpu.ts`;
  * the engine exports no subpath for it, and the RUM bundle needs only the string */
 const PIPELINE_COMPILE_MEASURE_PREFIX = "shallot:pipeline-compile:";
 
-const showcaseDir = engineExamples();
+const showcaseDir = shallotExamples;
 const outDir = resolve(root, "out/site");
 
 /** Bundles `src/rum-runtime.ts` (which imports the pure sampler) to a single browser-target ESM
@@ -140,75 +115,27 @@ function injectRum(
 async function main(): Promise<void> {
     const args = process.argv.slice(2);
     if (args.includes("--help") || args.includes("-h")) {
-        console.log(`Usage: bun run build [--demo <slug>] [--candidate]
+        console.log(`Usage: bun run build [--demo <slug>] [--staging]
 
-Builds every showcase demo in .engine/ as an ejected consumer of the selected
-@dylanebert/shallot identity, assembles out/site/<slug>/ per demo, and emits out/site/index.html.
+Builds every example shipped by the installed @dylanebert/shallot package and emits out/site/.
 
 Options:
   --demo <slug>   Build a single demo by its roster slug
-  --candidate     Use the qualified full-SHA Git candidate instead of the stable release`);
+  --staging       Use the staging RUM environment and emit source maps`);
         process.exit(0);
     }
 
     const idx = args.indexOf("--demo");
     const only = idx !== -1 ? args[idx + 1] : undefined;
 
-    const candidate = args.includes("--candidate");
-    const mode: "prod" | "staging" = candidate ? "staging" : "prod";
-
-    if (!existsSync(showcaseDir)) {
-        console.error(`✗ no engine checkout at ${engineRoot} — run \`bun run engine\` first`);
-        process.exit(1);
-    }
-    const version = engineVersion;
-    const refShort = engineRef();
-    if (candidate) {
-        if (engineCommit() !== engineCandidate) {
-            console.error(
-                `✗ .engine is at ${engineCommit()}, not candidate ${engineCandidate} — run \`bun run candidate\``,
-            );
-            process.exit(1);
-        }
-    } else {
-        const tag = checkoutTag();
-        if (tag !== engineTag) {
-            console.error(
-                `✗ .engine is at ${tag ?? refShort}, not ${engineTag} — run \`bun run engine\``,
-            );
-            process.exit(1);
-        }
-        if (engineTag !== `v${version}`) {
-            console.error(
-                `✗ engine.json pins ${engineTag} but package.json pins @dylanebert/shallot ${version}`,
-            );
-            process.exit(1);
-        }
-    }
+    const mode: "prod" | "staging" = args.includes("--staging") ? "staging" : "prod";
+    const version = shallotVersion;
 
     if (only && !ROSTER.some((d) => d.slug === only)) {
         console.error(`no demo "${only}" — one of: ${ROSTER.map((d) => d.slug).join(", ")}`);
         process.exit(2);
     }
     const demos = only ? ROSTER.filter((d) => d.slug === only) : ROSTER;
-
-    // Discover extensions before touching output. Candidate builds must use the committed demo
-    // and packed-extension inputs named by the pinned engine SHA, never a mutable checkout view.
-    const extensionNames = new Set<string>();
-    for (const demo of demos) {
-        const demoPkg = (await Bun.file(
-            resolve(showcaseDir, demo.slug, "package.json"),
-        ).json()) as DemoPackage;
-        for (const name of workspaceExtensionDependencies(demoPkg)) extensionNames.add(name);
-    }
-    if (candidate) {
-        const showcasePrefix = `${relative(engineRoot, showcaseDir).split(sep).join("/")}/`;
-        assertPinnedCandidateInputs(
-            engineRoot,
-            engineCandidate,
-            candidateInputScopes(showcasePrefix, extensionNames),
-        );
-    }
 
     // clean + recreate the output dir — a single-demo build only clears that demo's slot,
     // so a prior full build's other demos survive
@@ -219,150 +146,105 @@ Options:
     }
     mkdirSync(outDir, { recursive: true });
 
-    const buildId = applicationBuildId(engineCommit());
-
-    // Workspace extensions are packed in both modes because unpublished packages cannot be
-    // installed by an outside consumer.
-    let enginePin = version;
-    const packDest = mkdtempSync(join(tmpdir(), "shallot-site-pack-"));
-    const extensionPins = new Map<string, string>();
-    const pack = (name: string, packageDir: string): string => {
-        const destination = resolve(packDest, name.replace("/", "-"));
-        mkdirSync(destination, { recursive: true });
-        console.log(`\npacking ${name}...`);
-        const result = Bun.spawnSync(["bun", "pm", "pack", "--destination", destination], {
-            cwd: packageDir,
-            stdout: "inherit",
-            stderr: "inherit",
-        });
-        if (result.exitCode !== 0) throw new Error(`\`bun pm pack\` failed for ${packageDir}`);
-        const tgz = readdirSync(destination).find((f) => f.endsWith(".tgz") && !f.startsWith("."));
-        if (!tgz) throw new Error(`no tarball produced in ${destination}`);
-        return `file:${resolve(destination, tgz)}`;
-    };
-    if (candidate) enginePin = `github:dylanebert/shallot#${engineCandidate}`;
-    for (const name of [...extensionNames].sort()) {
-        const packageDir = resolve(engineRoot, "packages", name.slice("@dylanebert/".length));
-        extensionPins.set(name, pack(name, packageDir));
-    }
+    const buildId = applicationBuildId(version);
 
     const sizes: { slug: string; size: string }[] = [];
 
-    try {
-        for (const demo of demos) {
-            const slug = demo.slug;
-            const srcDir = resolve(showcaseDir, slug);
-            if (!existsSync(srcDir)) {
-                console.error(`✗ showcase dir not found: ${srcDir}`);
-                process.exit(1);
-            }
-
-            // Keep the scratch leaf at the slug so Vite's own page/build artifacts retain the
-            // project identity; the parent carries only the unique temporary name.
-            const scratchParent = mkdtempSync(join(tmpdir(), `shallot-site-${slug}-`));
-            const scratch = join(scratchParent, slug);
-            mkdirSync(scratch, { recursive: true });
-
-            try {
-                console.log(`\n=== ${slug} ===`);
-
-                cpSync(srcDir, scratch, {
-                    recursive: true,
-                    filter: (path) => isDemoCopyInput(relative(srcDir, path)),
-                });
-
-                const demoPkg = (await Bun.file(
-                    resolve(scratch, "package.json"),
-                ).json()) as DemoPackage;
-                rewriteSiteDependencies(demoPkg, enginePin, extensionPins);
-                const sitePackage = (await Bun.file(resolve(root, "package.json")).json()) as {
-                    devDependencies: Record<string, string>;
-                };
-                demoPkg.devDependencies ??= {};
-                demoPkg.devDependencies.vite = sitePackage.devDependencies.vite;
-                writeFileSync(
-                    resolve(scratch, "package.json"),
-                    `${JSON.stringify(demoPkg, null, 4)}\n`,
-                );
-
-                for (const file of ["index.html", "vite.config.ts"]) {
-                    if (!existsSync(resolve(scratch, file))) {
-                        throw new Error(`${slug} must own ${file}; build will not synthesize it`);
-                    }
-                }
-                console.log(`  installing...`);
-                const install = Bun.spawnSync(["bun", "install"], {
-                    cwd: scratch,
-                    stdout: "inherit",
-                    stderr: "inherit",
-                });
-                if (install.exitCode !== 0) {
-                    console.error(`✗ install failed for ${slug}`);
-                    process.exit(1);
-                }
-
-                console.log(`  building...`);
-                const buildArgs = ["bunx", "vite", "build", "--base", "./"];
-                if (candidate && slug === "first-person") buildArgs.push("--sourcemap");
-                const build = Bun.spawnSync(buildArgs, {
-                    cwd: scratch,
-                    stdout: "inherit",
-                    stderr: "inherit",
-                });
-                if (build.exitCode !== 0) {
-                    console.error(`✗ build failed for ${slug}`);
-                    process.exit(1);
-                }
-
-                const dist = resolve(scratch, "dist");
-                if (!existsSync(dist)) {
-                    console.error(`✗ no dist/ produced for ${slug}`);
-                    process.exit(1);
-                }
-                const demoOut = resolve(outDir, slug);
-                cpSync(dist, demoOut, { recursive: true });
-                const runtimeDir = resolve(demoOut, "assets");
-                mkdirSync(runtimeDir, { recursive: true });
-                const runtimePath = resolve(runtimeDir, `shallot-rum-${buildId}.js`);
-                await buildRumRuntimeBundle(runtimePath, mode, slug, buildId);
-                injectRum(demoOut, runtimePath, mode, buildId);
-
-                const sizeBytes = dirSize(demoOut);
-                sizes.push({ slug, size: formatSize(sizeBytes) });
-                console.log(`  done — ${formatSize(sizeBytes)}`);
-            } finally {
-                rmSync(scratchParent, { recursive: true, force: true });
-            }
+    for (const demo of demos) {
+        const slug = demo.slug;
+        const srcDir = resolve(showcaseDir, slug);
+        if (!existsSync(srcDir)) {
+            console.error(`✗ installed example not found: ${srcDir}`);
+            process.exit(1);
         }
-    } finally {
-        rmSync(packDest, { recursive: true, force: true });
+
+        // Keep the scratch leaf at the slug so Vite's own page/build artifacts retain the
+        // project identity; the parent carries only the unique temporary name.
+        const scratchParent = mkdtempSync(join(tmpdir(), `shallot-site-${slug}-`));
+        const scratch = join(scratchParent, slug);
+
+        try {
+            console.log(`\n=== ${slug} ===`);
+            const add = Bun.spawnSync(
+                [process.execPath, resolve(shallotPackage, "bin/shallot.ts"), "add", slug, scratch],
+                { cwd: root, stdout: "inherit", stderr: "inherit" },
+            );
+            if (add.exitCode !== 0) throw new Error(`shallot add failed for ${slug}`);
+
+            const packagePath = resolve(scratch, "package.json");
+            const demoPkg = (await Bun.file(packagePath).json()) as {
+                dependencies?: Record<string, string>;
+            };
+            demoPkg.dependencies ??= {};
+            // shallot add writes the installed version. Install the resolved package directory
+            // locally, then point the demo at that same tree so staged overlays and live links are
+            // preserved without another registry lookup or a separate checkout.
+            demoPkg.dependencies["@dylanebert/shallot"] = `file:${shallotPackage}`;
+            writeFileSync(packagePath, `${JSON.stringify(demoPkg, null, 4)}\n`);
+
+            for (const file of ["index.html", "vite.config.ts"]) {
+                if (!existsSync(resolve(scratch, file))) {
+                    throw new Error(`${slug} must own ${file}; build will not synthesize it`);
+                }
+            }
+            console.log(`  installing...`);
+            const install = Bun.spawnSync(["bun", "install"], {
+                cwd: scratch,
+                stdout: "inherit",
+                stderr: "inherit",
+            });
+            if (install.exitCode !== 0) throw new Error(`install failed for ${slug}`);
+
+            const demoShallot = resolve(scratch, "node_modules/@dylanebert/shallot");
+            rmSync(demoShallot, { recursive: true, force: true });
+            symlinkSync(shallotPackage, demoShallot, "dir");
+            if (realpathSync(demoShallot) !== realpathSync(shallotPackage)) {
+                throw new Error(`${slug} resolved a different Shallot package: ${demoShallot}`);
+            }
+            console.log(`  shallot: ${version} (${realpathSync(demoShallot)})`);
+
+            console.log(`  building...`);
+            const buildArgs = ["bunx", "vite", "build", "--base", "./"];
+            if (mode === "staging" && slug === "first-person") buildArgs.push("--sourcemap");
+            const build = Bun.spawnSync(buildArgs, {
+                cwd: scratch,
+                stdout: "inherit",
+                stderr: "inherit",
+            });
+            if (build.exitCode !== 0) throw new Error(`build failed for ${slug}`);
+
+            const dist = resolve(scratch, "dist");
+            if (!existsSync(dist)) throw new Error(`no dist/ produced for ${slug}`);
+            const demoOut = resolve(outDir, slug);
+            cpSync(dist, demoOut, { recursive: true });
+            const runtimeDir = resolve(demoOut, "assets");
+            mkdirSync(runtimeDir, { recursive: true });
+            const runtimePath = resolve(runtimeDir, `shallot-rum-${buildId}.js`);
+            await buildRumRuntimeBundle(runtimePath, mode, slug, buildId);
+            injectRum(demoOut, runtimePath, mode, buildId);
+
+            const sizeBytes = dirSize(demoOut);
+            sizes.push({ slug, size: formatSize(sizeBytes) });
+            console.log(`  done — ${formatSize(sizeBytes)}`);
+        } finally {
+            rmSync(scratchParent, { recursive: true, force: true });
+        }
     }
 
     // the site's own pages beside the demos: the index (always the full roster, so a `--demo`
     // build's index still lists the others), llms.txt, and /brand/ with its downloads
     const client = await bundleClient();
     const rum = datadogInitSnippet(mode, buildId);
-    writeFileSync(
-        resolve(outDir, "index.html"),
-        siteIndex(ROSTER, version, refShort, mode, client, rum),
-    );
-    writeFileSync(resolve(outDir, "llms.txt"), llmsTxt(version, refShort, mode));
+    writeFileSync(resolve(outDir, "index.html"), siteIndex(ROSTER, version, mode, client, rum));
+    writeFileSync(resolve(outDir, "llms.txt"), llmsTxt(version));
     await buildBrand(outDir, client, rum);
 
-    // record what each demo was built from, so `check-site.ts` can tell an artifact of *these*
-    // sources from an artifact of some other sources. A production build reads an immutable tag,
-    // so its entries record the tag rather than a tree fingerprint.
-    const siteMode: SiteMode = candidate
-        ? { kind: "staging", pin: enginePin, commit: engineCommit() }
-        : { kind: "prod", version, tag: engineTag };
-    const fingerprints = candidate
-        ? demoFingerprints(
-              engineRoot,
-              demos.map((d) => d.slug),
-              root,
-          )
-        : Object.fromEntries(demos.map((d) => [d.slug, `tag:${engineTag}`]));
-    writeStamp(outDir, fingerprints, siteMode, buildId);
+    const fingerprints = demoFingerprints(
+        showcaseDir,
+        demos.map((d) => d.slug),
+        root,
+    );
+    writeStamp(outDir, fingerprints, { kind: mode, version }, buildId);
 
     const total = sizes.reduce((sum, s) => sum + parseSize(s.size), 0);
     console.log(`\n=== summary ===`);
@@ -371,9 +253,7 @@ Options:
     }
     console.log(`  total: ${formatSize(total)}`);
     console.log(`\n  index: ${resolve(outDir, "index.html")}`);
-    console.log(
-        `  built from: ${candidate ? `candidate (${enginePin})` : `v${version}`} (engine ${refShort})`,
-    );
+    console.log(`  built from: @dylanebert/shallot@${version} (${realpathSync(shallotPackage)})`);
 }
 
 function dirSize(dir: string): number {

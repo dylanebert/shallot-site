@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { root } from "../src/engine";
+import { root } from "../src/site";
 import type { PreparedSourceMaps } from "./prepare-sourcemaps";
 import { prepareSourceMaps } from "./prepare-sourcemaps";
 

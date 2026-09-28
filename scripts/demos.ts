@@ -2,8 +2,8 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
-import { engineCandidate, engineCommit, root } from "../src/engine";
 import { ROSTER } from "../src/roster";
+import { root } from "../src/site";
 
 // `bun run demos` is the site's display-gated demo gate. It builds ejected consumers through
 // `scripts/build-site.ts`, then asks each built page to use Shallot's public `captureFrame` contract
@@ -19,10 +19,10 @@ import { ROSTER } from "../src/roster";
 // Display-gated on a real display and conformant WebGPU adapter. A missing seat or fallback adapter
 // throws and remains inconclusive, never green. A green run is native hardware with every demo captured.
 //
-// The roster is the single source of truth — imported from `site/roster.ts`, never duplicated. It is
-// derived from the engine's tracked examples by enumeration, so a second copy is impossible by
-// construction. Ejection and building are not re-implemented: `scripts/build-site.ts` already ejects,
-// installs, and builds every roster demo into `out/site/<slug>/`. This script checks those built dirs.
+// The roster is the single source of truth — imported from `site/roster.ts`, which reads the
+// examples shipped by the installed Shallot package. Ejection and building are not re-implemented:
+// `scripts/build-site.ts` runs `shallot add`, installs the site's resolved package, and builds every
+// roster demo into `out/site/<slug>/`.
 
 const outDir = resolve(root, "out/site");
 
@@ -132,7 +132,7 @@ async function runDemo(slug: string, captureScript: string): Promise<DemoOutcome
 
     const demoOut = resolve(outDir, slug);
     if (!existsSync(demoOut)) {
-        console.log(`FAIL: ${slug} — no build at out/site/${slug}/ (run \`bun run site\` first)`);
+        console.log(`FAIL: ${slug} — no build at out/site/${slug}/ (run \`bun run build\` first)`);
         return { slug, result: "fail", entryPoints: 0, detail: "no build output" };
     }
 
@@ -172,13 +172,12 @@ async function main(): Promise<void> {
     if (args.includes("--help") || args.includes("-h")) {
         console.log(`Usage: bun run demos [--demo <slug>]
 
-Builds every showcase demo (via \`bun run build\`) and runs the public \`captureFrame\` contract over each
+Builds every packaged example (via \`bun run build\`) and runs the public \`captureFrame\` contract over each
 built HTML entry point that presents a canvas directly — display-gated, on real hardware. A missing
 seat or off-contract frame refuses; it is not green.
 
 Options:
   --demo <slug>   Build and capture a single demo by its roster slug
-  --candidate     Use the qualified full-SHA candidate for both build and capture
 
 Environment:
   CHROME_PATH     Use a non-empty explicit browser path instead of managed Chromium`);
@@ -187,11 +186,6 @@ Environment:
 
     const idx = args.indexOf("--demo");
     const only = idx !== -1 ? args[idx + 1] : undefined;
-    const candidate = args.includes("--candidate");
-    if (candidate && engineCommit() !== engineCandidate) {
-        console.error(`✗ .engine is at ${engineCommit()}, not candidate ${engineCandidate}`);
-        process.exit(1);
-    }
     if (only && !ROSTER.some((d) => d.slug === only)) {
         console.error(`no demo "${only}" — one of: ${ROSTER.map((d) => d.slug).join(", ")}`);
         process.exit(2);
@@ -213,7 +207,6 @@ Environment:
     // --- build ---
     console.log("Building site demos...");
     const buildArgs = only ? ["run", "build", "--demo", only] : ["run", "build"];
-    if (candidate) buildArgs.push("--candidate");
     const build = Bun.spawnSync(["bun", ...buildArgs], {
         cwd: root,
         stdout: "inherit",

@@ -1,16 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Glob } from "bun";
-import { root } from "./engine";
 import { RUM_CONFIG } from "./rum-config";
+import { root } from "./site";
 
 const SITE_BUILD_INPUTS = [
     "package.json",
     "bun.lock",
-    "engine.json",
     "scripts/build-site.ts",
     "scripts/build-pages.ts",
-    "scripts/build-site-logic.ts",
     "src/home.ts",
     "src/roster.ts",
     "src/brand/client.ts",
@@ -18,6 +16,7 @@ const SITE_BUILD_INPUTS = [
     "src/brand/theme.ts",
     "src/brand/png.ts",
     "src/rum-build.ts",
+    "src/site.ts",
     "src/rum-config.ts",
     "src/rum-runtime.ts",
     "src/rum-sampler.ts",
@@ -26,10 +25,10 @@ const SITE_BUILD_INPUTS = [
     "src/site-stamp.ts",
 ];
 
-/** Immutable service version from the checked-out engine revision and exact site build inputs. */
-export function applicationBuildId(engineCommit: string, siteRoot = root): string {
+/** Immutable service version from the installed Shallot version and exact site build inputs. */
+export function applicationBuildId(shallotVersion: string, siteRoot = root): string {
     const hash = new Bun.CryptoHasher("sha256");
-    hash.update(`shallot-site-rum-build-v1\0${engineCommit}\0`);
+    hash.update(`shallot-site-rum-build-v2\0${shallotVersion}\0`);
     for (const path of SITE_BUILD_INPUTS) {
         const full = resolve(siteRoot, path);
         if (!existsSync(full)) throw new Error(`missing application build input: ${path}`);

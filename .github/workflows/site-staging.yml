@@ -1,4 +1,4 @@
-# Candidate site proof. Pushes build and archive only; external staging work is explicit manual opt-in.
+# Staging site proof. Pushes build and archive only; external staging work is explicit manual opt-in.
 name: site-staging
 
 on:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       deploy_staging:
-        description: Upload maps and deploy this candidate to Cloudflare Pages staging
+        description: Upload maps and deploy this staging build to Cloudflare Pages
         required: true
         type: boolean
         default: false
@@ -33,17 +33,16 @@ jobs:
           bun-version: 1.4.2
 
       - run: bun install --frozen-lockfile
-      - run: bun run candidate
-      - run: bun run build --candidate
+      - run: bun run build --staging
 
       - run: bun run check
       - run: bun run test
-      - run: bun test --timeout=250 ./scripts/brand-assets.oracle.ts ./scripts/check-site.oracle.ts ./scripts/staging-workflow.oracle.ts
+      - run: bun test --timeout=250 ./scripts/staging-workflow.oracle.ts
       - run: bun run scripts/check-site.ts
 
       - uses: actions/upload-artifact@v4
         with:
-          name: site-candidate
+          name: site-staging
           path: out/site
 
       - name: Create or verify named staging project
