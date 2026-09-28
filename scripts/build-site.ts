@@ -290,10 +290,6 @@ Options:
                         throw new Error(`${slug} must own ${file}; build will not synthesize it`);
                     }
                 }
-                // The TypeGPU transform needs a project tsconfig while reaching installed engine
-                // source; inline the engine compiler options without its workspace-only paths.
-                writeFileSync(resolve(scratch, "tsconfig.json"), `${standaloneTsconfig()}\n`);
-
                 console.log(`  installing...`);
                 const install = Bun.spawnSync(["bun", "install"], {
                     cwd: scratch,
@@ -377,34 +373,6 @@ Options:
     console.log(`\n  index: ${resolve(outDir, "index.html")}`);
     console.log(
         `  built from: ${candidate ? `candidate (${enginePin})` : `v${version}`} (engine ${refShort})`,
-    );
-}
-
-function standaloneTsconfig(): string {
-    return JSON.stringify(
-        {
-            compilerOptions: {
-                lib: ["ESNext", "DOM"],
-                target: "ESNext",
-                module: "ESNext",
-                moduleDetection: "force",
-                allowJs: true,
-                moduleResolution: "bundler",
-                verbatimModuleSyntax: true,
-                resolveJsonModule: true,
-                noEmit: true,
-                strict: true,
-                skipLibCheck: true,
-                noFallthroughCasesInSwitch: true,
-                noImplicitOverride: true,
-                noUnusedLocals: false,
-                noUnusedParameters: false,
-                noPropertyAccessFromIndexSignature: false,
-                types: ["@webgpu/types"],
-            },
-        },
-        null,
-        4,
     );
 }
 

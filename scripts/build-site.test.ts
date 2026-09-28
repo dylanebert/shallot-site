@@ -150,6 +150,7 @@ test("clean pinned inputs pass; copied or packed edits, deletions, and additions
     const demoPrefix = "examples/showcase/demo/";
     const extensionPrefix = "packages/shallot-wave/";
     const scopes = candidateInputScopes("examples/showcase/", ["@dylanebert/shallot-wave"]);
+    expect(isDemoCopyInput("tsconfig.json")).toBe(false);
     try {
         run("git", "init", "-q");
         run("git", "config", "user.email", "test@example.invalid");

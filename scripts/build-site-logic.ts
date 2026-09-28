@@ -14,7 +14,7 @@ export type CandidateInputScope = {
 };
 
 const DEMO_COPY_EXCLUDED_DIRS = new Set(["node_modules", ".git", ".cache", ".artifacts", "target"]);
-const DEMO_COPY_EXCLUDED_FILES = new Set([".DS_Store", "Thumbs.db"]);
+const DEMO_COPY_EXCLUDED_FILES = new Set([".DS_Store", "Thumbs.db", "tsconfig.json"]);
 const BUN_PACK_EXCLUDED_DIRS = new Set(["node_modules", ".git"]);
 
 export function candidateInputScopes(
