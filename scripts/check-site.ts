@@ -35,8 +35,8 @@ import { nonWorkspaceShallotDependencies } from "./build-site";
 //      clauses skip with a note, the same shape as an absent `out/site/`.
 //
 //
-//   1. every entry's dir has a manifest — a showcase dir without `shallot.json` (or, for an
-//      ejected project, `index.html`) is not a buildable demo.
+//   1. every showcase app owns its `index.html` and `vite.config.ts`; a manifest alone is
+//      project data, not a runnable app.
 //   2. the ejected manifest names the release version — the in-repo `package.json` pins
 //      `@dylanebert/shallot` as `workspace:*`; the build script rewrites it to the release version
 //      from `package.json`. This clause verifies the in-repo form is `workspace:*`
@@ -64,9 +64,8 @@ import { nonWorkspaceShallotDependencies } from "./build-site";
 //      views, and must not carry the sampler bundle (`slow_frame`), since a page of text has no
 //      frame loop to observe.
 //      Same `SITE_OUT_REQUIRED` gate as clause 4.
-//   6. every built demo root page has a human-readable <title> — a manifest demo's is the bare
-//      slug (the site builder's compatibility entry uses the demo slug); an own-index demo's just must
-//      not be scratch-shaped.
+//   6. every built demo root page has a human-readable <title> — an app-owned page must not
+//      carry a scratch-shaped title.
 //   7. no built page carries a placeholder RUM credential — gated behind RUM_CONFIG_REQUIRED
 //      (armed on the deploy path only; see the clause body).
 //
@@ -93,21 +92,19 @@ if (!existsSync(showcaseDir) || ROSTER.length === 0) {
     fail("✗ refused site artifact check: missing .engine checkout or empty showcase roster");
 }
 
-// --- clause 1: every entry's dir has a manifest -------------------------------------------
+// --- clause 1: every showcase app owns its page and Vite config ---------------------------
 
-const noManifest: string[] = [];
+const missingAppFiles: string[] = [];
 for (const { slug } of ROSTER) {
     const dir = resolve(showcaseDir, slug);
-    const hasManifest = existsSync(resolve(dir, "shallot.json"));
-    const hasIndex = existsSync(resolve(dir, "index.html"));
-    if (!hasManifest && !hasIndex) {
-        noManifest.push(slug);
+    for (const file of ["index.html", "vite.config.ts"]) {
+        if (!existsSync(resolve(dir, file))) missingAppFiles.push(`${slug}/${file}`);
     }
 }
 
-if (noManifest.length > 0) {
-    console.error(`✗ showcase dir(s) without a manifest (shallot.json or index.html):\n`);
-    for (const s of noManifest) console.error(`  ${s}`);
+if (missingAppFiles.length > 0) {
+    console.error(`✗ showcase app(s) missing their own index.html or vite.config.ts:\n`);
+    for (const file of missingAppFiles) console.error(`  ${file}`);
     process.exit(1);
 }
 
@@ -507,22 +504,18 @@ if (pageDefects.length > 0) {
 
 // --- clause 6: every built demo root page has a human-readable <title> --------------------
 //
-// The site builder's compatibility entry gives a manifest demo its slug as the <title>, and
-// the site build ejects each demo into a scratch tree — so the scratch leaf must be named the
-// bare slug, or every tab reads like a temp path (measured 2026-08-25: `shallot-site-collapse-1756…`
-// live on dylanebert.com). Manifest demos (no own
-// index.html) must title exactly the slug; a demo shipping its own index.html owns its title,
-// which just must not be scratch-shaped. Red-first witnessed 2026-08-25 against a synthetic
-// out/site fixture clearing clauses 4/5 (exit 1 listing every scratch-shaped title; exit 0 with
-// slug titles) — the real-build leg is CI's SITE_OUT_REQUIRED deploy run.
+// The site build ejects each app into a scratch tree, but its own page supplies the title. A
+// scratch-shaped title (`shallot-site-collapse-1756…`) is not acceptable. Red-first witnessed
+// 2026-08-25 against a synthetic out/site fixture clearing clauses 4/5 (exit 1 listing every
+// scratch-shaped title; exit 0 with human-readable titles) — the real-build leg is CI's
+// SITE_OUT_REQUIRED deploy run.
 const badTitle: { file: string; title: string }[] = [];
 for (const { slug } of ROSTER) {
     const builtIndex = resolve(outDir, slug, "index.html");
     if (!existsSync(builtIndex)) continue; // a `--demo` filtered build only writes some dirs
     const html = readFileSync(builtIndex, "utf8");
     const title = html.match(/<title>([^<]*)<\/title>/)?.[1] ?? "";
-    const ownsIndex = existsSync(resolve(showcaseDir, slug, "index.html"));
-    if (ownsIndex ? title.includes("shallot-site-") : title !== slug) {
+    if (title.includes("shallot-site-")) {
         badTitle.push({ file: `${slug}/index.html`, title });
     }
 }
@@ -530,9 +523,7 @@ if (badTitle.length > 0) {
     console.error(`✗ ${badTitle.length} built demo page(s) carry a non-human-readable <title>:\n`);
     for (const t of badTitle) console.error(`  ${t.file}: <title>${t.title}</title>`);
     console.error(
-        "\nA manifest demo's compatibility <title> is the ejected dir's basename, so" +
-            " `scripts/build-site.ts` must eject into `<unique-parent>/<slug>` — the parent" +
-            " carries the uniqueness, the leaf carries the name.",
+        "\nA built app's own page must supply a human-readable <title>, not a scratch path.",
     );
     process.exit(1);
 }

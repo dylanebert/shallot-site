@@ -257,8 +257,8 @@ Options:
                 process.exit(1);
             }
 
-            // the demo dir's basename must be the slug: a compatibility entry uses it for the
-            // <title>, so a unique parent carries the uniqueness and the leaf stays clean
+            // Keep the scratch leaf at the slug so Vite's own page/build artifacts retain the
+            // project identity; the parent carries only the unique temporary name.
             const scratchParent = mkdtempSync(join(tmpdir(), `shallot-site-${slug}-`));
             const scratch = join(scratchParent, slug);
             mkdirSync(scratch, { recursive: true });
@@ -275,10 +275,6 @@ Options:
                     resolve(scratch, "package.json"),
                 ).json()) as DemoPackage;
                 rewriteSiteDependencies(demoPkg, enginePin, extensionPins);
-                for (const dependencies of [demoPkg.dependencies, demoPkg.devDependencies]) {
-                    if (!dependencies) continue;
-                    delete dependencies["unplugin-typegpu"];
-                }
                 const sitePackage = (await Bun.file(resolve(root, "package.json")).json()) as {
                     devDependencies: Record<string, string>;
                 };
@@ -289,28 +285,15 @@ Options:
                     `${JSON.stringify(demoPkg, null, 4)}\n`,
                 );
 
-                // Ejection makes a missing entry or config part of this runnable app. Older owned
-                // configs get the Shallot plugin in place of their separate TypeGPU transform.
-                const index = resolve(scratch, "index.html");
-                if (!existsSync(index)) writeFileSync(index, manifestIndex(slug));
-                const viteConfig = resolve(scratch, "vite.config.ts");
-                if (!existsSync(viteConfig)) {
-                    writeFileSync(viteConfig, manifestViteConfig());
-                } else {
-                    const config = readFileSync(viteConfig, "utf8");
-                    if (config.includes('from "unplugin-typegpu/vite"')) {
-                        const migrated = config
-                            .replace(/^import typegpu from "unplugin-typegpu\/vite";\s*/m, "")
-                            .replace(/\btypegpu\(\)/g, "shallot()");
-                        writeFileSync(
-                            viteConfig,
-                            `import { shallot } from "@dylanebert/shallot/vite";\n\n${migrated}`,
-                        );
+                for (const file of ["index.html", "vite.config.ts"]) {
+                    if (!existsSync(resolve(scratch, file))) {
+                        throw new Error(`${slug} must own ${file}; build will not synthesize it`);
                     }
                 }
-
-                // the in-repo tsconfig extends an engine-root path that doesn't exist outside it
+                // The TypeGPU transform needs a project tsconfig while reaching installed engine
+                // source; inline the engine compiler options without its workspace-only paths.
                 writeFileSync(resolve(scratch, "tsconfig.json"), `${standaloneTsconfig()}\n`);
+
                 console.log(`  installing...`);
                 const install = Bun.spawnSync(["bun", "install"], {
                     cwd: scratch,
@@ -397,9 +380,6 @@ Options:
     );
 }
 
-// The standalone tsconfig — the engine's compilerOptions inlined, minus the workspace-only
-// `paths` mapping. `@webgpu/types` is a dependency of the published package, so it resolves in
-// the ejected install.
 function standaloneTsconfig(): string {
     return JSON.stringify(
         {
@@ -451,36 +431,6 @@ function parseSize(s: string): number {
     if (unit === "K") return n * 1024;
     if (unit === "M") return n * 1024 * 1024;
     return n;
-}
-
-function manifestIndex(name: string): string {
-    return `<!doctype html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link rel="icon" type="image/svg+xml" href="./icon.svg" />
-        <title>${name}</title>
-        <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { background: #0c0a09; overflow: hidden; }
-            canvas { display: block; width: 100vw; height: 100vh; }
-        </style>
-    </head>
-    <body>
-        <canvas id="canvas"></canvas>
-        <script type="module">
-            import { BrowserInputPlugin, run } from "@dylanebert/shallot";
-            import project from "virtual:project";
-            await run({ plugins: [BrowserInputPlugin, ...project.plugins], scene: project.scene ?? undefined, defaults: false, capacity: project.capacity ?? undefined, pixelRatio: project.pixelRatio ?? undefined });
-        </script>
-    </body>
-</html>
-`;
-}
-
-function manifestViteConfig(): string {
-    return `import { shallot } from "@dylanebert/shallot/vite";\n\nexport default { plugins: [shallot()] };\n`;
 }
 
 if (import.meta.main) {
