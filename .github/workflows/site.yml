@@ -31,8 +31,11 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - run: bun run engine
+      # The named oracle tier checks the candidate layout and is run by its own path.
+      - run: bun run candidate
+      - run: bun test --timeout=250 ./scripts/brand-assets.oracle.ts ./scripts/check-site.oracle.ts ./scripts/staging-workflow.oracle.ts
 
+      - run: bun run engine
       - run: bun run build
 
       # Native carrier gates must pass before the artifact reaches the Pages publish step.

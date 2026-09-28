@@ -65,7 +65,7 @@ import { nonWorkspaceShallotDependencies } from "./build-site";
 //      frame loop to observe.
 //      Same `SITE_OUT_REQUIRED` gate as clause 4.
 //   6. every built demo root page has a human-readable <title> — a manifest demo's is the bare
-//      slug (`synthIndex` titles from the ejected dir's basename); an own-index demo's just must
+//      slug (the site builder's compatibility entry uses the demo slug); an own-index demo's just must
 //      not be scratch-shaped.
 //   7. no built page carries a placeholder RUM credential — gated behind RUM_CONFIG_REQUIRED
 //      (armed on the deploy path only; see the clause body).
@@ -507,10 +507,10 @@ if (pageDefects.length > 0) {
 
 // --- clause 6: every built demo root page has a human-readable <title> --------------------
 //
-// `shallot build` synthesizes a manifest project's <title> from the project dir's basename
-// (bin/build.ts `synthIndex`), and the site build ejects each demo into a scratch tree — so the
-// scratch leaf must be named the bare slug, or every tab reads like a temp path (measured
-// 2026-08-25: `shallot-site-collapse-1756…` live on dylanebert.com). Manifest demos (no own
+// The site builder's compatibility entry gives a manifest demo its slug as the <title>, and
+// the site build ejects each demo into a scratch tree — so the scratch leaf must be named the
+// bare slug, or every tab reads like a temp path (measured 2026-08-25: `shallot-site-collapse-1756…`
+// live on dylanebert.com). Manifest demos (no own
 // index.html) must title exactly the slug; a demo shipping its own index.html owns its title,
 // which just must not be scratch-shaped. Red-first witnessed 2026-08-25 against a synthetic
 // out/site fixture clearing clauses 4/5 (exit 1 listing every scratch-shaped title; exit 0 with
@@ -530,8 +530,8 @@ if (badTitle.length > 0) {
     console.error(`✗ ${badTitle.length} built demo page(s) carry a non-human-readable <title>:\n`);
     for (const t of badTitle) console.error(`  ${t.file}: <title>${t.title}</title>`);
     console.error(
-        "\nA manifest demo's <title> is the ejected dir's basename (bin/build.ts `synthIndex`)," +
-            " so `scripts/build-site.ts` must eject into `<unique-parent>/<slug>` — the parent" +
+        "\nA manifest demo's compatibility <title> is the ejected dir's basename, so" +
+            " `scripts/build-site.ts` must eject into `<unique-parent>/<slug>` — the parent" +
             " carries the uniqueness, the leaf carries the name.",
     );
     process.exit(1);

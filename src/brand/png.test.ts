@@ -1,9 +1,9 @@
 // The site's narrow PNG decoder, proved over independently encoded bytes: every supported RGBA
 // filter reconstructs, and malformed or unsupported inputs refuse.
 
-import { expect } from "bun:test";
+import { expect, test } from "bun:test";
 import { deflateSync } from "node:zlib";
-import { check } from "@dylanebert/shallot/harness/check";
+
 import { decodePng } from "./png";
 
 const TEST_PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -267,23 +267,15 @@ const malformedPngs: ReadonlyArray<readonly [string, Uint8Array]> = [
     ["wrong inflated scanline length", validPng(Uint8Array.of(0, 1, 2, 3))],
 ];
 
-check(
-    "brand PNG decoder reconstructs all supported RGBA filters",
-    { claim: "reconstructs all supported RGBA filters" },
-    () => {
-        const decoded = decodePng(filterPng);
-        expect(decoded.width).toBe(3);
-        expect(decoded.height).toBe(5);
-        expect(Array.from(decoded.pixels)).toEqual(filterPixels);
-    },
-);
+test("reconstructs all supported RGBA filters", () => {
+    const decoded = decodePng(filterPng);
+    expect(decoded.width).toBe(3);
+    expect(decoded.height).toBe(5);
+    expect(Array.from(decoded.pixels)).toEqual(filterPixels);
+}, 250);
 
-check(
-    "brand PNG decoder refuses malformed or unsupported narrow inputs",
-    { claim: "refuses malformed or unsupported narrow PNG inputs" },
-    () => {
-        for (const [name, bytes] of malformedPngs) {
-            expect(() => decodePng(bytes), name).toThrow();
-        }
-    },
-);
+test("refuses malformed or unsupported narrow PNG inputs", () => {
+    for (const [name, bytes] of malformedPngs) {
+        expect(() => decodePng(bytes), name).toThrow();
+    }
+}, 250);

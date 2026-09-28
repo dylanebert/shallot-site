@@ -1,4 +1,4 @@
-import { CAPTURE_CONTRACT, captureFrame } from "@dylanebert/shallot/harness/capture";
+import { CAPTURE_CONTRACT, captureFrame } from "@dylanebert/shallot/rendering";
 
 const canvas = document.querySelector("canvas");
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error("demo capture refused: no canvas");

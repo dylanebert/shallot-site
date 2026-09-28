@@ -38,6 +38,7 @@ jobs:
 
       - run: bun run check
       - run: bun run test
+      - run: bun test --timeout=250 ./scripts/brand-assets.oracle.ts ./scripts/check-site.oracle.ts ./scripts/staging-workflow.oracle.ts
       - run: bun run scripts/check-site.ts
 
       - uses: actions/upload-artifact@v4

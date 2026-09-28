@@ -12,14 +12,13 @@
         "pages": "bun run scripts/build-pages.ts",
         "demos": "bun run scripts/demos.ts",
         "candidate": "bun run engine --candidate",
-        "list": "shallot test --list",
-        "check": "tsc --noEmit && biome check && shallot test --list",
-        "test": "shallot test"
+        "check": "tsc --noEmit && biome check",
+        "test": "bun test --timeout=250"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.5.13",
         "@datadog/datadog-ci": "5.24.0",
-        "@dylanebert/shallot": "github:dylanebert/shallot#69f12a06438d8ce80aa1ab9e4b34de5b58820e15",
+        "@dylanebert/shallot": "github:dylanebert/shallot#5ceae0633dae262bcd90506a9cd7c1b1ba79b770",
         "@types/bun": "latest",
         "@types/node": "^26.0.0",
         "playwright": "^1.63.0",

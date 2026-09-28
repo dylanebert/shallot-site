@@ -52,8 +52,7 @@ export { datadogInitSnippet };
 // `bun run build` builds every showcase demo from the stable engine tag as an ejected consumer
 // of the published package. `--candidate` uses the same pipeline against the qualified full-SHA
 // Git candidate for unreleased proof. Each demo is copied to /tmp, its Shallot dependency is
-// rewritten to the selected immutable identity, and the installed `shallot build` bin creates the
-// artifact.
+// rewritten to the selected immutable identity, then its own Vite config builds the artifact.
 
 /** the literal `PIPELINE_COMPILE_MEASURE_PREFIX` in the engine's `src/engine/runtime/gpu.ts`;
  * the engine exports no subpath for it, and the RUM bundle needs only the string */
@@ -258,8 +257,8 @@ Options:
                 process.exit(1);
             }
 
-            // the demo dir's basename must be the slug: `shallot build` synthesizes the page
-            // <title> from it, so a unique parent carries the uniqueness and the leaf stays clean
+            // the demo dir's basename must be the slug: a compatibility entry uses it for the
+            // <title>, so a unique parent carries the uniqueness and the leaf stays clean
             const scratchParent = mkdtempSync(join(tmpdir(), `shallot-site-${slug}-`));
             const scratch = join(scratchParent, slug);
             mkdirSync(scratch, { recursive: true });
@@ -276,28 +275,42 @@ Options:
                     resolve(scratch, "package.json"),
                 ).json()) as DemoPackage;
                 rewriteSiteDependencies(demoPkg, enginePin, extensionPins);
+                for (const dependencies of [demoPkg.dependencies, demoPkg.devDependencies]) {
+                    if (!dependencies) continue;
+                    delete dependencies["unplugin-typegpu"];
+                }
+                const sitePackage = (await Bun.file(resolve(root, "package.json")).json()) as {
+                    devDependencies: Record<string, string>;
+                };
+                demoPkg.devDependencies ??= {};
+                demoPkg.devDependencies.vite = sitePackage.devDependencies.vite;
                 writeFileSync(
                     resolve(scratch, "package.json"),
                     `${JSON.stringify(demoPkg, null, 4)}\n`,
                 );
 
-                // the in-repo tsconfig extends an engine-root path that doesn't exist outside it
-                writeFileSync(resolve(scratch, "tsconfig.json"), `${standaloneTsconfig()}\n`);
-                if (candidate && slug === "first-person") {
-                    const viteConfig = resolve(scratch, "vite.config.ts");
-                    if (existsSync(viteConfig)) {
-                        throw new Error(
-                            "first-person gained a vite.config.ts; merge the source-map plugin instead of replacing it",
+                // Ejection makes a missing entry or config part of this runnable app. Older owned
+                // configs get the Shallot plugin in place of their separate TypeGPU transform.
+                const index = resolve(scratch, "index.html");
+                if (!existsSync(index)) writeFileSync(index, manifestIndex(slug));
+                const viteConfig = resolve(scratch, "vite.config.ts");
+                if (!existsSync(viteConfig)) {
+                    writeFileSync(viteConfig, manifestViteConfig());
+                } else {
+                    const config = readFileSync(viteConfig, "utf8");
+                    if (config.includes('from "unplugin-typegpu/vite"')) {
+                        const migrated = config
+                            .replace(/^import typegpu from "unplugin-typegpu\/vite";\s*/m, "")
+                            .replace(/\btypegpu\(\)/g, "shallot()");
+                        writeFileSync(
+                            viteConfig,
+                            `import { shallot } from "@dylanebert/shallot/vite";\n\n${migrated}`,
                         );
                     }
-                    // The pinned Shallot build loads project Vite plugins for manifest projects.
-                    // A config-hook plugin is necessary because buildWeb intentionally owns build options.
-                    writeFileSync(
-                        viteConfig,
-                        `export default { plugins: [{ name: "shallot-site-sourcemaps", config: () => ({ build: { sourcemap: true } }) }] };\n`,
-                    );
                 }
 
+                // the in-repo tsconfig extends an engine-root path that doesn't exist outside it
+                writeFileSync(resolve(scratch, "tsconfig.json"), `${standaloneTsconfig()}\n`);
                 console.log(`  installing...`);
                 const install = Bun.spawnSync(["bun", "install"], {
                     cwd: scratch,
@@ -310,7 +323,9 @@ Options:
                 }
 
                 console.log(`  building...`);
-                const build = Bun.spawnSync(["bunx", "shallot", "build"], {
+                const buildArgs = ["bunx", "vite", "build", "--base", "./"];
+                if (candidate && slug === "first-person") buildArgs.push("--sourcemap");
+                const build = Bun.spawnSync(buildArgs, {
                     cwd: scratch,
                     stdout: "inherit",
                     stderr: "inherit",
@@ -436,6 +451,36 @@ function parseSize(s: string): number {
     if (unit === "K") return n * 1024;
     if (unit === "M") return n * 1024 * 1024;
     return n;
+}
+
+function manifestIndex(name: string): string {
+    return `<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+        <title>${name}</title>
+        <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { background: #0c0a09; overflow: hidden; }
+            canvas { display: block; width: 100vw; height: 100vh; }
+        </style>
+    </head>
+    <body>
+        <canvas id="canvas"></canvas>
+        <script type="module">
+            import { BrowserInputPlugin, run } from "@dylanebert/shallot";
+            import project from "virtual:project";
+            await run({ plugins: [BrowserInputPlugin, ...project.plugins], scene: project.scene ?? undefined, defaults: false, capacity: project.capacity ?? undefined, pixelRatio: project.pixelRatio ?? undefined });
+        </script>
+    </body>
+</html>
+`;
+}
+
+function manifestViteConfig(): string {
+    return `import { shallot } from "@dylanebert/shallot/vite";\n\nexport default { plugins: [shallot()] };\n`;
 }
 
 if (import.meta.main) {
