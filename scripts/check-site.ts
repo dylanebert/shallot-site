@@ -155,7 +155,9 @@ for (const { slug } of ROSTER) {
     const glob = new Glob("**/*.{ts,svelte,js,mjs}");
     for await (const path of glob.scan({ cwd: dir })) {
         if (path.includes("node_modules") || path.includes("dist")) continue;
-        if (path.endsWith(".test.ts")) continue; // tests aren't part of the build
+        if (path === "playwright.config.ts" || /\.(?:test|gpu|node|oracle|e2e)\.ts$/.test(path)) {
+            continue; // test tiers and Playwright config are not Vite build inputs
+        }
         const full = resolve(dir, path);
         const lines = (await Bun.file(full).text()).split("\n");
         for (let i = 0; i < lines.length; i++) {
