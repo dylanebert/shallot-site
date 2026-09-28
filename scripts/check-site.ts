@@ -9,8 +9,8 @@ import {
     RUM_ENV_USAGE,
     RUM_INJECTION_MARKER,
 } from "../src/rum-config";
-import { root, shallotExamples, shallotVersion } from "../src/site";
-import { readStamp, STAMP_FILE, staleDemos } from "../src/site-stamp";
+import { installedShallotIdentity, root, shallotExamples } from "../src/site";
+import { mismatchedShallotDemos, readStamp, STAMP_FILE, staleDemos } from "../src/site-stamp";
 
 const outDir = process.env.SITE_OUT_DIR
     ? resolve(process.env.SITE_OUT_DIR)
@@ -82,16 +82,21 @@ if (!stamp) {
     console.log(`✓ site inputs clean; no valid ${STAMP_FILE}, skipping artifact checks`);
     process.exit(0);
 }
-if (stamp.mode.version !== shallotVersion) {
+const shallotIdentity = installedShallotIdentity();
+if (stamp.mode.version !== shallotIdentity.version) {
     fail(
-        `✗ build stamp uses Shallot ${stamp.mode.version}, but this site resolves ${shallotVersion}`,
+        `✗ build stamp uses Shallot ${stamp.mode.version}, but this site resolves ${shallotIdentity.version}`,
     );
 }
-if (stamp.buildId !== applicationBuildId(shallotVersion)) {
+if (stamp.buildId !== applicationBuildId(shallotIdentity)) {
     fail("✗ build stamp does not match the current site inputs and installed Shallot version");
 }
 
 const slugs = ROSTER.map(({ slug }) => slug);
+const identityDefects = mismatchedShallotDemos(stamp, outDir, slugs, shallotIdentity);
+if (identityDefects.length > 0) {
+    fail(`✗ built demo Shallot identity mismatch:\n  ${identityDefects.join("\n  ")}`);
+}
 const stale = staleDemos(shallotExamples, outDir, slugs, root);
 if (stale.length > 0) {
     if (process.env.SITE_OUT_REQUIRED === "1") {
@@ -201,4 +206,6 @@ if (process.env.RUM_CONFIG_REQUIRED === "1") {
 }
 
 if (defects.length > 0) fail(`✗ site artifact defects:\n  ${defects.join("\n  ")}`);
-console.log(`✓ site roster clean (${ROSTER.length} examples from Shallot ${shallotVersion})`);
+console.log(
+    `✓ site roster clean (${ROSTER.length} examples from Shallot ${shallotIdentity.version})`,
+);

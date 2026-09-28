@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Glob } from "bun";
 import { RUM_CONFIG } from "./rum-config";
-import { root } from "./site";
+import { root, type ShallotIdentity } from "./site";
 
 const SITE_BUILD_INPUTS = [
     "package.json",
@@ -25,10 +25,10 @@ const SITE_BUILD_INPUTS = [
     "src/site-stamp.ts",
 ];
 
-/** Immutable service version from the installed Shallot version and exact site build inputs. */
-export function applicationBuildId(shallotVersion: string, siteRoot = root): string {
+/** Immutable service version from the installed Shallot content and exact site build inputs. */
+export function applicationBuildId(shallot: ShallotIdentity, siteRoot = root): string {
     const hash = new Bun.CryptoHasher("sha256");
-    hash.update(`shallot-site-rum-build-v2\0${shallotVersion}\0`);
+    hash.update(`shallot-site-rum-build-v3\0${shallot.version}\0${shallot.contentHash}\0`);
     for (const path of SITE_BUILD_INPUTS) {
         const full = resolve(siteRoot, path);
         if (!existsSync(full)) throw new Error(`missing application build input: ${path}`);

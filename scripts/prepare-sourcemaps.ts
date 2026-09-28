@@ -7,8 +7,8 @@ import {
     sourceMapUploadPlan,
     validateSourceMaps,
 } from "../src/rum-build";
-import { root, shallotExamples, shallotVersion } from "../src/site";
-import { readStamp, staleDemos } from "../src/site-stamp";
+import { installedShallotIdentity, root, shallotExamples } from "../src/site";
+import { mismatchedShallotDemos, readStamp, staleDemos } from "../src/site-stamp";
 
 export interface PreparedSourceMaps {
     assets: string;
@@ -28,7 +28,8 @@ export async function prepareSourceMaps(
     context: Partial<SourceMapPreparationContext> = {},
 ): Promise<PreparedSourceMaps[]> {
     const examples = context.examplesRoot ?? shallotExamples;
-    const version = context.version ?? shallotVersion;
+    const identity = installedShallotIdentity();
+    const version = context.version ?? identity.version;
     const slugs = context.slugs ?? ROSTER.map(({ slug }) => slug);
     const outDir = resolve(artifactDir);
     const stamp = readStamp(outDir);
@@ -38,8 +39,12 @@ export async function prepareSourceMaps(
     if (stamp.mode.version !== version) {
         throw new Error(`staging artifact uses Shallot ${stamp.mode.version}, expected ${version}`);
     }
-    if (stamp.buildId !== applicationBuildId(version)) {
+    if (stamp.buildId !== applicationBuildId(identity)) {
         throw new Error("build stamp does not match the current site inputs and installed package");
+    }
+    const identityDefects = mismatchedShallotDemos(stamp, outDir, slugs, identity);
+    if (identityDefects.length > 0) {
+        throw new Error(`mixed Shallot identities: ${identityDefects.join("; ")}`);
     }
     const stale = staleDemos(examples, outDir, slugs, root);
     if (stale.length > 0) {

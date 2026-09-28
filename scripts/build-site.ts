@@ -17,7 +17,7 @@ import { llmsTxt, siteIndex } from "../src/home";
 import { ROSTER } from "../src/roster";
 import { applicationBuildId } from "../src/rum-build";
 import { datadogInitSnippet } from "../src/rum-config";
-import { root, shallotExamples, shallotPackage, shallotVersion } from "../src/site";
+import { installedShallotIdentity, root, shallotExamples, shallotPackage } from "../src/site";
 import { demoFingerprints, writeStamp } from "../src/site-stamp";
 import { buildBrand, bundleClient } from "./build-pages";
 
@@ -129,7 +129,8 @@ Options:
     const only = idx !== -1 ? args[idx + 1] : undefined;
 
     const mode: "prod" | "staging" = args.includes("--staging") ? "staging" : "prod";
-    const version = shallotVersion;
+    const shallot = installedShallotIdentity();
+    const version = shallot.version;
 
     if (only && !ROSTER.some((d) => d.slug === only)) {
         console.error(`no demo "${only}" — one of: ${ROSTER.map((d) => d.slug).join(", ")}`);
@@ -146,7 +147,7 @@ Options:
     }
     mkdirSync(outDir, { recursive: true });
 
-    const buildId = applicationBuildId(version);
+    const buildId = applicationBuildId(shallot);
 
     const sizes: { slug: string; size: string }[] = [];
 
@@ -201,7 +202,9 @@ Options:
             if (realpathSync(demoShallot) !== realpathSync(shallotPackage)) {
                 throw new Error(`${slug} resolved a different Shallot package: ${demoShallot}`);
             }
-            console.log(`  shallot: ${version} (${realpathSync(demoShallot)})`);
+            console.log(
+                `  shallot: ${version} sha256:${shallot.contentHash} (${realpathSync(demoShallot)})`,
+            );
 
             console.log(`  building...`);
             const buildArgs = ["bunx", "vite", "build", "--base", "./"];
@@ -244,7 +247,7 @@ Options:
         demos.map((d) => d.slug),
         root,
     );
-    writeStamp(outDir, fingerprints, { kind: mode, version }, buildId);
+    writeStamp(outDir, fingerprints, { kind: mode, version }, buildId, shallot);
 
     const total = sizes.reduce((sum, s) => sum + parseSize(s.size), 0);
     console.log(`\n=== summary ===`);
@@ -253,7 +256,9 @@ Options:
     }
     console.log(`  total: ${formatSize(total)}`);
     console.log(`\n  index: ${resolve(outDir, "index.html")}`);
-    console.log(`  built from: @dylanebert/shallot@${version} (${realpathSync(shallotPackage)})`);
+    console.log(
+        `  built from: @dylanebert/shallot@${version} sha256:${shallot.contentHash} (${realpathSync(shallotPackage)})`,
+    );
 }
 
 function dirSize(dir: string): number {

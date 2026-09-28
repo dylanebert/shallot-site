@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve, sep } from "node:path";
+import type { ShallotIdentity } from "./site";
 
 /** The stamp lives at the root of the output dir, next to `index.html`. */
 export const STAMP_FILE = "build-stamp.json";
@@ -17,13 +18,30 @@ function isSiteMode(value: unknown): value is SiteMode {
 }
 
 export interface SiteStamp {
-    recipe: 1;
+    recipe: 2;
     buildId: string;
     mode: SiteMode;
     demos: Record<string, string>;
+    shallot: Record<string, ShallotIdentity>;
 }
 
-const RECIPE: SiteStamp["recipe"] = 1;
+const RECIPE: SiteStamp["recipe"] = 2;
+
+function isShallotIdentity(value: unknown): value is ShallotIdentity {
+    if (typeof value !== "object" || value === null) return false;
+    const identity = value as Record<string, unknown>;
+    return (
+        typeof identity.version === "string" &&
+        typeof identity.contentHash === "string" &&
+        /^[a-f0-9]{64}$/.test(identity.contentHash)
+    );
+}
+
+function isShallotIdentityMap(value: unknown): value is Record<string, ShallotIdentity> {
+    return (
+        typeof value === "object" && value !== null && Object.values(value).every(isShallotIdentity)
+    );
+}
 
 const BUILDER_FILES = [
     "package.json",
@@ -105,7 +123,8 @@ export function readStamp(outDirPath: string): SiteStamp | null {
             typeof parsed.buildId !== "string" ||
             typeof parsed.demos !== "object" ||
             parsed.demos === null ||
-            !isSiteMode(parsed.mode)
+            !isSiteMode(parsed.mode) ||
+            !isShallotIdentityMap(parsed.shallot)
         ) {
             return null;
         }
@@ -114,6 +133,7 @@ export function readStamp(outDirPath: string): SiteStamp | null {
             buildId: parsed.buildId,
             mode: parsed.mode,
             demos: parsed.demos as Record<string, string>,
+            shallot: parsed.shallot,
         };
     } catch {
         return null;
@@ -123,6 +143,26 @@ export function readStamp(outDirPath: string): SiteStamp | null {
 export interface StaleDemo {
     slug: string;
     reason: string;
+}
+
+/** Demo slots built from a different Shallot tree than the site currently resolves. */
+export function mismatchedShallotDemos(
+    stamp: SiteStamp,
+    outDirPath: string,
+    slugs: string[],
+    resolved: ShallotIdentity,
+): string[] {
+    return slugs.flatMap((slug) => {
+        if (!existsSync(resolve(outDirPath, slug))) return [];
+        const built = stamp.shallot[slug];
+        if (!built) return [`${slug}: no Shallot identity in build stamp`];
+        if (built.version !== resolved.version || built.contentHash !== resolved.contentHash) {
+            return [
+                `${slug}: built with Shallot ${built.version} sha256:${built.contentHash}, site resolves ${resolved.version} sha256:${resolved.contentHash}`,
+            ];
+        }
+        return [];
+    });
 }
 
 export function staleDemos(
@@ -158,6 +198,7 @@ export function writeStamp(
     entries: Record<string, string>,
     mode: SiteMode,
     buildId: string,
+    shallot: ShallotIdentity,
 ): void {
     const prior = readStamp(outDirPath);
     const stamp: SiteStamp = {
@@ -165,6 +206,10 @@ export function writeStamp(
         buildId,
         mode,
         demos: { ...(prior?.demos ?? {}), ...entries },
+        shallot: {
+            ...(prior?.shallot ?? {}),
+            ...Object.fromEntries(Object.keys(entries).map((slug) => [slug, shallot])),
+        },
     };
     writeFileSync(resolve(outDirPath, STAMP_FILE), `${JSON.stringify(stamp, null, 4)}\n`);
 }

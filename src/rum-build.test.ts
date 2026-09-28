@@ -10,9 +10,11 @@ import {
     validateSourceMaps,
 } from "./rum-build";
 
-test("runtime and source-map service version is deterministic and changes with installed Shallot version", () => {
-    expect(applicationBuildId("0.10.0-next.1")).toBe(applicationBuildId("0.10.0-next.1"));
-    expect(applicationBuildId("0.10.0-next.1")).not.toBe(applicationBuildId("0.10.0-next.2"));
+test("runtime identity is deterministic and changes when same-version Shallot content changes", () => {
+    const markerA = { version: "0.10.0-next.2", contentHash: "a".repeat(64) };
+    const markerB = { version: "0.10.0-next.2", contentHash: "b".repeat(64) };
+    expect(applicationBuildId(markerA)).toBe(applicationBuildId(markerA));
+    expect(applicationBuildId(markerA)).not.toBe(applicationBuildId(markerB));
 }, 250);
 
 test("upload preparation uses the exact runtime identity and deployed asset prefix without a network call", () => {
