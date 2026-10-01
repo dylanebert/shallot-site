@@ -118,12 +118,12 @@ export function llmsTxt(version: string): string {
 
 > webgpu game engine. fast by default, instant iteration, runs where webgpu does.
 
-The source is the reference: every public export carries a JSDoc contract, and there is no docs site to drift from it. Start with the README; grep the examples index for the problem you have.
+The source is the reference: every public export carries a JSDoc contract, and there is no docs site to drift from it. Start with the README; \`bunx shallot add\` lists examples for the problem you have.
 
 ## Read
 
 - [README](${raw("README.md")}): setup, CLI, recipes, live demos and build targets.
-- [Examples index](${raw("examples/AGENTS.md")}): one line per recipe and showcase project, with the concept each teaches.
+- [Examples](https://github.com/dylanebert/shallot/tree/${at}/examples): \`bunx shallot add\` lists them.
 
 ## Start
 

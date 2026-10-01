@@ -1,5 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readdirSync } from "node:fs";
 import { shallotExamples } from "./site";
 
 export interface DemoEntry {
@@ -20,12 +19,6 @@ if (!existsSync(shallotExamples)) {
 
 const slugs = readdirSync(shallotExamples, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .filter((entry) => {
-        const manifest = resolve(shallotExamples, entry.name, "shallot.json");
-        if (!existsSync(manifest)) return false;
-        const parsed = JSON.parse(readFileSync(manifest, "utf8")) as { kind?: unknown };
-        return parsed.kind === "recipe";
-    })
     .map((entry) => entry.name)
     .sort();
 
@@ -33,5 +26,5 @@ if (slugs.length === 0) {
     throw new Error(`installed Shallot package has no addable examples: ${shallotExamples}`);
 }
 
-/** Every packaged recipe is in the site's demo population. */
+/** Every installed example directory is in the site's demo population. */
 export const ROSTER: DemoEntry[] = slugs.map((slug) => ({ slug, title: deriveTitle(slug) }));
