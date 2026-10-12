@@ -5,7 +5,7 @@ import { chromium } from "playwright";
 import { ROSTER } from "../src/roster";
 import { root } from "../src/site";
 
-// `bun run demos` is the site's display-gated demo gate. It builds ejected consumers through
+// `bun scripts/demos.ts` is the site's display-gated demo gate. It builds ejected consumers through
 // `scripts/build-site.ts`, then asks each built page to use Shallot's public `captureFrame` contract
 // on a positively identified real adapter. A build, adapter, capture, or contract failure reds.
 //
@@ -132,7 +132,9 @@ async function runDemo(slug: string, captureScript: string): Promise<DemoOutcome
 
     const demoOut = resolve(outDir, slug);
     if (!existsSync(demoOut)) {
-        console.log(`FAIL: ${slug} — no build at out/site/${slug}/ (run \`bun run build\` first)`);
+        console.log(
+            `FAIL: ${slug} — no build at out/site/${slug}/ (run \`bun scripts/build-site.ts\` first)`,
+        );
         return { slug, result: "fail", entryPoints: 0, detail: "no build output" };
     }
 
@@ -170,9 +172,9 @@ async function runDemo(slug: string, captureScript: string): Promise<DemoOutcome
 async function main(): Promise<void> {
     const args = process.argv.slice(2);
     if (args.includes("--help") || args.includes("-h")) {
-        console.log(`Usage: bun run demos [--demo <slug>]
+        console.log(`Usage: bun scripts/demos.ts [--demo <slug>]
 
-Builds every packaged example (via \`bun run build\`) and runs the public \`captureFrame\` contract over each
+Builds every packaged example (via \`bun scripts/build-site.ts\`) and runs the public \`captureFrame\` contract over each
 built HTML entry point that presents a canvas directly — display-gated, on real hardware. A missing
 seat or off-contract frame refuses; it is not green.
 
@@ -206,7 +208,7 @@ Environment:
 
     // --- build ---
     console.log("Building site demos...");
-    const buildArgs = only ? ["run", "build", "--demo", only] : ["run", "build"];
+    const buildArgs = only ? ["scripts/build-site.ts", "--demo", only] : ["scripts/build-site.ts"];
     const build = Bun.spawnSync(["bun", ...buildArgs], {
         cwd: root,
         stdout: "inherit",

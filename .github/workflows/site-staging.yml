@@ -33,13 +33,13 @@ jobs:
           bun-version-file: .bun-version
 
       - run: bun install --frozen-lockfile
-      - run: bun run build --staging
+      - run: bun scripts/build-site.ts --staging
 
       - run: bun check
       - run: bun run lint
       - run: bun run test
       - run: bun test --timeout=250 ./scripts/staging-workflow.oracle.ts
-      - run: bun run scripts/check-site.ts
+      - run: bun scripts/check-site.ts
 
       - uses: actions/upload-artifact@v4
         with:
@@ -52,13 +52,13 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: bun run scripts/staging-project.ts
+        run: bun scripts/staging-project.ts
 
       - name: Upload source maps for this build
         if: ${{ env.CF_DEPLOY_READY == 'true' }}
         env:
           DATADOG_API_KEY: ${{ secrets.DD_API_KEY }}
-        run: bun run sourcemaps:upload -- --upload out/site "${{ steps.pages.outputs.hostname }}"
+        run: bun scripts/upload-sourcemaps.ts --upload out/site "${{ steps.pages.outputs.hostname }}"
 
       - name: Deploy the same identified build to Cloudflare Pages
         if: ${{ env.CF_DEPLOY_READY == 'true' }}

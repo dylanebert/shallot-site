@@ -31,13 +31,13 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - run: bun run build
+      - run: bun scripts/build-site.ts
 
       # Native carrier gates must pass before the artifact reaches the Pages publish step.
       - run: bun check
       - run: bun run lint
       - run: bun run test
-      - run: bun run scripts/check-site.ts
+      - run: bun scripts/check-site.ts
 
       - uses: actions/upload-artifact@v4
         with:

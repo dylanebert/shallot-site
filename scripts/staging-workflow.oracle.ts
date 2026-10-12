@@ -31,13 +31,13 @@ test("only an opted-in manual run with all required credentials reaches staging 
         );
     }
     expect(workflow).toContain('SITE_OUT_REQUIRED: "1"');
-    expect(workflow).toContain("bun run build --staging");
-    expect(workflow).toContain("bun run sourcemaps:upload -- --upload out/site");
-    expect(workflow).not.toContain("bun run sourcemaps:prepare");
+    expect(workflow).toContain("bun scripts/build-site.ts --staging");
+    expect(workflow).toContain("bun scripts/upload-sourcemaps.ts --upload out/site");
+    expect(workflow).not.toContain("bun scripts/prepare-sourcemaps.ts");
     expect(workflow).toContain("wrangler pages deploy out/site --project-name=shallot-staging");
     expect(workflow).toContain("path: out/site");
     const archive = workflow.indexOf("          name: site-staging");
-    expect(archive).toBeGreaterThan(workflow.indexOf("bun run scripts/check-site.ts"));
+    expect(archive).toBeGreaterThan(workflow.indexOf("bun scripts/check-site.ts"));
     expect(workflow.slice(archive, workflow.indexOf("\n\n", archive))).not.toContain("if:");
     expect(workflow).not.toContain("main.shallot-staging.pages.dev");
 }, 250);
@@ -45,7 +45,7 @@ test("only an opted-in manual run with all required credentials reaches staging 
 test("SITE_OUT_REQUIRED on the workflow check makes absent output fail rather than pass", () => {
     const missingOutput = mkdtempSync(join(tmpdir(), "staging-no-artifact-"));
     try {
-        const result = Bun.spawnSync([process.execPath, "run", "scripts/check-site.ts"], {
+        const result = Bun.spawnSync([process.execPath, "scripts/check-site.ts"], {
             cwd: resolve(import.meta.dir, ".."),
             env: {
                 ...process.env,

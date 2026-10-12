@@ -17,8 +17,8 @@ import { ROSTER } from "../src/roster";
 import { datadogInitSnippet } from "../src/rum-config";
 import { root, shallotVersion } from "../src/site";
 
-// `bun run pages` — the site's own pages without the demos: out/site/index.html, llms.txt and
-// out/site/brand/ with its downloads. `build-site.ts` calls the same function after the demo
+// `bun scripts/build-pages.ts` builds the site's own pages without demos: index.html, llms.txt and
+// the downloads under out/site/brand/. `build-site.ts` calls the same function after the demo
 // loop, so this is also how to iterate on the pages locally without a demo build. Run alone it
 // builds in staging mode; links and labels still identify the installed Shallot package version.
 

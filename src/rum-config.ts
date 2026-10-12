@@ -19,7 +19,7 @@ export const RUM_INJECTION_MARKER = "<!-- shallot: datadog rum slow-frame vitals
 // Plain, dependency-free inline JS — runs in the visitor's browser before `DD_RUM.init`, so it
 // cannot import anything. Derives the Datadog `env` facet from the served hostname: "prod" for
 // dylanebert.com and any subdomain (the site is served at dylanebert.com/shallot/, README.md /
-// AGENTS.md), "local" otherwise (a `bun run verify`/dev preview at localhost, or a raw
+// AGENTS.md), "local" otherwise (a local dev preview, or a raw
 // `file://`/IP checkout) — so a localhost preview is tagged "local" and never pollutes prod's
 // slow-frame vitals. One shared string: `scripts/build-site.ts` injects
 // it verbatim and `scripts/check-site.ts`'s env-presence clause matches on the same literal, so
@@ -57,7 +57,7 @@ const DATADOG_RUM_CDN_URL = `https://www.datadoghq-browser-agent.com/us1/v${DATA
 // every serve surface — for the multithreaded WASM kernel, unrelated to RUM) and the CDN never sends a
 // `Cross-Origin-Resource-Policy` header, so a plain no-cors `<script src>` load is blocked
 // (`net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep`, reproduced 2026-08-25 —
-// every `bun run demos` entry point failed on it). The CDN does answer a CORS request with
+// every `bun scripts/demos.ts` entry point failed on it). The CDN does answer a CORS request with
 // `Access-Control-Allow-Origin: *` (verified against a request carrying an `Origin` header), and a
 // CORS-mode load is exempt from the CORP check entirely — so `crossOrigin` fixes the file-preview failure
 // without needing a header change in the installed Shallot package or the deployed site, which never

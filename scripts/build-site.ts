@@ -25,7 +25,7 @@ import { buildBrand, bundleClient } from "./build-pages";
 // re-exported here because the site tests import it from this module
 export { datadogInitSnippet };
 
-// `bun run build` ejects every example from the Shallot package installed by this site. `--staging`
+// `bun scripts/build-site.ts` ejects every example from the Shallot package installed by this site. `--staging`
 // changes only the RUM environment and source-map output; each demo uses the same installed package
 // path the site itself resolves, including a staged package overlay or a live link.
 
@@ -115,7 +115,7 @@ function injectRum(
 async function main(): Promise<void> {
     const args = process.argv.slice(2);
     if (args.includes("--help") || args.includes("-h")) {
-        console.log(`Usage: bun run build [--demo <slug>] [--staging]
+        console.log(`Usage: bun scripts/build-site.ts [--demo <slug>] [--staging]
 
 Builds every example shipped by the installed @dylanebert/shallot package and emits out/site/.
 

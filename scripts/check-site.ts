@@ -66,14 +66,15 @@ if (escaped.length > 0) {
 }
 
 if (!existsSync(outDir)) {
-    if (process.env.SITE_OUT_REQUIRED === "1") fail("✗ out/site/ is absent — run `bun run build`");
+    if (process.env.SITE_OUT_REQUIRED === "1")
+        fail("✗ out/site/ is absent — run `bun scripts/build-site.ts`");
     console.log(
         `✓ site inputs clean (${ROSTER.length} packaged examples); out/site/ not built yet`,
     );
     process.exit(0);
 }
 if (process.env.SITE_OUT_REQUIRED === "1" && readdirSync(outDir).length === 0) {
-    fail("✗ out/site/ is empty — run `bun run build`");
+    fail("✗ out/site/ is empty — run `bun scripts/build-site.ts`");
 }
 
 const stamp = readStamp(outDir);
