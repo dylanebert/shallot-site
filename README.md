@@ -4,7 +4,8 @@ the demos at [dylanebert.com/shallot](https://dylanebert.com/shallot/), built fr
 
 ```bash
 bun install --frozen-lockfile
-bun run check
+bun check
+bun run lint
 bun run test
 bun run build      # package pinned in package.json and bun.lock
 bun run demos      # capture each demo on a real device

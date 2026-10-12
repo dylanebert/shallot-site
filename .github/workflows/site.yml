@@ -27,14 +27,15 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.2
+          bun-version-file: .bun-version
 
       - run: bun install --frozen-lockfile
 
       - run: bun run build
 
       # Native carrier gates must pass before the artifact reaches the Pages publish step.
-      - run: bun run check
+      - run: bun check
+      - run: bun run lint
       - run: bun run test
       - run: bun run scripts/check-site.ts
 
