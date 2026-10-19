@@ -8,7 +8,7 @@ bun check
 bun run lint
 bun run test
 bun scripts/build-site.ts # package pinned in package.json and bun.lock
-bun scripts/demos.ts      # capture each demo on a real device
+bunx playwright test     # existing artifact starts headlessly under /shallot/
 ```
 
 `bun scripts/build-site.ts --staging` uses the same installed package and additionally emits staging RUM configuration and source maps. Production deploys the regular build after the package version and artifact checks pass. GitHub Pages publishes `out/site` through `site.yml`.

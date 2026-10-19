@@ -2,7 +2,13 @@
     "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
     "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
     "files": {
-        "includes": ["src/**/*.ts", "scripts/**/*.ts", "*.json"]
+        "includes": [
+            "src/**/*.ts",
+            "scripts/**/*.ts",
+            "tests/**/*.ts",
+            "playwright.config.ts",
+            "*.json"
+        ]
     },
     "linter": {
         "enabled": true,

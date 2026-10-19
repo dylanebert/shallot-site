@@ -1,8 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** The site repo root. */
-export const root = resolve(import.meta.dir, "..");
+export const root = fileURLToPath(new URL("../", import.meta.url));
 
 /** The package directory Bun installed for the site's Shallot dependency. */
 export const shallotPackage = resolve(root, "node_modules/@dylanebert/shallot");

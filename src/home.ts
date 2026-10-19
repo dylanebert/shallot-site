@@ -134,7 +134,7 @@ bun install
 bunx shallot dev
 \`\`\`
 
-The site's \`bun scripts/demos.ts\` gate builds each ejected demo, then uses Shallot's public \`captureFrame\` contract on a positively identified real-device browser seat. The frame is diagnostic evidence; the fixed capture identity and adapter record carry the verdict.
+The site's \`bunx playwright test\` checks that the existing built artifact starts headlessly under \`/shallot/\`. Run \`bun scripts/build-site.ts\` first; missing or stale output fails. Rendering and device evidence belong to Shallot's example checks and RUM.
 
 ## Links
 

@@ -40,6 +40,8 @@ jobs:
       - run: bun run test
       - run: bun test --timeout=250 ./scripts/staging-workflow.oracle.ts
       - run: bun scripts/check-site.ts
+      - run: bunx playwright install --with-deps chromium
+      - run: bunx playwright test
 
       - uses: actions/upload-artifact@v4
         with:
