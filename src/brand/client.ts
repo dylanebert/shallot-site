@@ -104,3 +104,12 @@ const note = document.querySelector<HTMLElement>("[data-webgpu-note]");
 const forced = new URLSearchParams(location.search).get("webgpu");
 const hasGpu = forced === null ? "gpu" in navigator : forced !== "0";
 if (note && !hasGpu) note.hidden = false;
+
+// Each example's copy button puts its create command on the clipboard and shows a check briefly.
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
+    button.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(button.dataset.copy ?? "");
+        button.dataset.copied = "";
+        setTimeout(() => delete button.dataset.copied, 1200);
+    });
+}

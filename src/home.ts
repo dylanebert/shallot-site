@@ -1,5 +1,16 @@
 import { lockup, toSvg } from "./brand/mark";
-import { AGENTS_LINK, CSS_PALETTE, FONTS, STYLE, THEME_SCRIPT, TOGGLE, top } from "./brand/theme";
+import {
+    AGENTS_LINK,
+    CHECK,
+    CODE,
+    COPY,
+    CSS_PALETTE,
+    FONTS,
+    STYLE,
+    THEME_SCRIPT,
+    TOGGLE,
+    top,
+} from "./brand/theme";
 import type { DemoEntry } from "./roster";
 
 // The site home at /shallot/: the lockup splashing in, the one-line promise, quick start, the
@@ -23,7 +34,7 @@ export function siteIndex(
     const rows = demos
         .map(
             (d) =>
-                `<li><a class="play" href="./${d.slug}/">${d.slug}</a><a class="code" href="${codeUrl(d.slug)}" target="_blank" rel="noopener">code</a></li>`,
+                `<li><a class="play" href="./${d.slug}/">${d.slug}</a><button class="icon" type="button" aria-label="Copy the command to create ${d.slug}" title="bun create shallot ${d.slug} --template ${d.slug}" data-copy="bun create shallot ${d.slug} --template ${d.slug}">${COPY}${CHECK}</button><a class="icon" href="${codeUrl(d.slug)}" target="_blank" rel="noopener" aria-label="${d.slug} source">${CODE}</a></li>`,
         )
         .join("\n");
     const out = (href: string, text: string) =>
@@ -56,8 +67,11 @@ header p { font-size: 17px; text-wrap: balance; }
 .demos li { display: flex; align-items: center; border-bottom: 1px solid var(--line); font-family: "JetBrains Mono", monospace; font-size: 13px; }
 .demos li:last-child { border-bottom: none; }
 .demos .play { flex: 1; padding: 10px 0; }
-.demos .code { padding: 10px 0 10px 24px; color: var(--muted); }
-.demos .code:hover { color: var(--gold); }
+.demos .icon { display: inline-flex; padding: 10px 0 10px 16px; color: var(--muted); background: none; border: 0; cursor: pointer; }
+.demos .icon:hover, .demos .icon:focus-visible { color: var(--gold); }
+.demos .icon svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.demos .icon svg + svg, .demos .icon[data-copied] svg:first-child { display: none; }
+.demos .icon[data-copied] svg + svg { display: block; }
 .needs { font-size: 13px; }
 .warn { color: var(--gold); font-size: 14px; }
 .warn a { text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--gold) 45%, transparent); text-underline-offset: 3px; }
