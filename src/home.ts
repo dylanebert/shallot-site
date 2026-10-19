@@ -3,9 +3,9 @@ import { AGENTS_LINK, CSS_PALETTE, FONTS, STYLE, THEME_SCRIPT, TOGGLE, top } fro
 import type { DemoEntry } from "./roster";
 
 // The site home at /shallot/: the lockup splashing in, the one-line promise, quick start, the
-// demos, and the foot: a row of small links (brand, llms.txt, github, npm, changelog), then the
+// examples, and the foot: a row of small links (brand, llms.txt, github, npm, changelog), then the
 // copyright, license, and build label. The top row is only the GitHub and npm icons; brand is a
-// detail that doesn't earn a place there. The demos themselves are built
+// detail that doesn't earn a place there. The examples themselves are built
 // separately; `clientScript` is the bundled `site/brand/client.ts`, `rum` the Datadog init
 // snippet (page views only, no frame sampler).
 
@@ -85,14 +85,21 @@ curl -fsSL https://<a href="https://bun.sh" target="_blank" rel="noopener">bun.s
 bun create shallot my-game
 cd my-game
 bun install</pre>
-<pre class="block"><span class="c"># run it</span>
-bunx shallot dev</pre>
+<pre class="block"><span class="c"># list commands</span>
+bunx shallot --help</pre>
+<pre class="block"><span class="c"># run the game</span>
+bun run dev</pre>
 </div>
+<p>open the url in a <a href="https://caniuse.com/webgpu" target="_blank" rel="noopener">supported browser</a>.</p>
 </section>
 
 <section>
-<h2>demos</h2>
-<p class="warn" data-webgpu-note hidden><a href="https://caniuse.com/webgpu" target="_blank" rel="noopener">WebGPU not supported.</a> Demos will not run.</p>
+<h2>examples</h2>
+<div class="steps">
+<pre class="block"><span class="c"># copy one</span>
+bun create shallot &lt;name&gt; --template &lt;name&gt;</pre>
+</div>
+<p class="warn" data-webgpu-note hidden><a href="https://caniuse.com/webgpu" target="_blank" rel="noopener">WebGPU not supported.</a> examples will not run.</p>
 <ul class="demos">
 ${rows}
 </ul>
@@ -118,20 +125,44 @@ export function llmsTxt(version: string): string {
 
 > webgpu game engine. fast by default, instant iteration, runs where webgpu does.
 
-The source is the reference: every public export carries a JSDoc contract, and there is no docs site to drift from it. Start with the README; \`bunx shallot add\` lists examples for the problem you have.
+Start with the README; \`bun create shallot --help\` lists examples for the problem you have.
 
 ## Read
 
-- [README](${raw("README.md")}): setup, CLI, recipes, live demos and build targets.
-- [Examples](https://github.com/dylanebert/shallot/tree/${at}/examples): \`bunx shallot add\` lists them.
+- [README](${raw("README.md")}): quick start and examples.
+- [Examples](https://github.com/dylanebert/shallot/tree/${at}/examples): \`bun create shallot --help\` lists them.
 
 ## Start
 
 \`\`\`
+# install bun
+curl -fsSL https://bun.sh/install | bash
+
+# new project
 bun create shallot my-game
 cd my-game
 bun install
-bunx shallot dev
+
+# list commands
+bunx shallot --help
+
+# run the game
+bun run dev
+\`\`\`
+
+open the url in a [supported browser](https://caniuse.com/webgpu).
+
+get started by exploring examples. start from one:
+
+\`\`\`
+# list them
+bun create shallot --help
+
+# copy one
+bun create shallot <name> --template <name>
+cd <name>
+bun install
+bun run dev
 \`\`\`
 
 The site's \`bunx playwright test\` checks that the existing built artifact starts headlessly under \`/shallot/\`. Run \`bun scripts/build-site.ts\` first; missing or stale output fails. Rendering and device evidence belong to Shallot's example checks and RUM.
@@ -140,7 +171,7 @@ The site's \`bunx playwright test\` checks that the existing built artifact star
 
 - Source: https://github.com/dylanebert/shallot
 - Package: https://www.npmjs.com/package/@dylanebert/shallot
-- Demos: https://dylanebert.com/shallot/
+- Examples: https://dylanebert.com/shallot/
 - Brand: https://dylanebert.com/shallot/brand/
 `;
 }

@@ -16,15 +16,14 @@ for (const el of document.querySelectorAll<HTMLElement>("[data-splash-svg]")) {
 }
 
 // A terminal, as a terminal paints it: text in the real font, block cells as flush fills at the
-// cell's own geometry. What `bun create shallot` prints, splash included.
+// cell's own geometry. The create output uses ./my-game in place of its absolute path.
 for (const canvas of document.querySelectorAll<HTMLCanvasElement>("[data-terminal]")) {
     const font = 13;
     const lines = [
         "$ bun create shallot my-game",
         null,
-        "· wrote my-game/shallot.json",
-        "· wrote my-game/main.scene",
-        "· ready in 41ms",
+        "created ./my-game from minimal",
+        "  cd my-game && bun install && bun run dev",
         "$ ",
     ];
     const splashRows = 7;
@@ -57,7 +56,7 @@ for (const canvas of document.querySelectorAll<HTMLCanvasElement>("[data-termina
             });
         });
     };
-    const after = [END_TICK + 4, END_TICK + 7, END_TICK + 10, END_TICK + 13];
+    const after = [END_TICK + 4, END_TICK + 7, END_TICK + 10];
     const draw = (tick: number) => {
         ctx.clearRect(0, 0, cols * cw, rows * ch);
         text(0, lines[0] ?? "", DARK.ink);
@@ -65,8 +64,8 @@ for (const canvas of document.querySelectorAll<HTMLCanvasElement>("[data-termina
         let row = 1 + splashRows;
         lines.slice(2).forEach((line, i) => {
             const at = after[i] ?? 0;
-            if (tick >= at && line) text(row, line, i === 3 ? DARK.ink : "#a08c78");
-            if (tick >= at && i === 3) {
+            if (tick >= at && line) text(row, line, i === 2 ? DARK.ink : "#a08c78");
+            if (tick >= at && i === 2) {
                 ctx.fillStyle = DARK.gold;
                 ctx.fillRect(2 * cw, row * ch, cw, ch);
             }
@@ -77,12 +76,12 @@ for (const canvas of document.querySelectorAll<HTMLCanvasElement>("[data-termina
     let last = -1;
     let raf = 0;
     const loop = () => {
-        const tick = reduced ? (after[3] ?? 0) : Math.floor((performance.now() - start) / TICK_MS);
+        const tick = reduced ? (after[2] ?? 0) : Math.floor((performance.now() - start) / TICK_MS);
         if (tick !== last) {
             last = tick;
             draw(tick);
         }
-        if (tick <= (after[3] ?? 0)) raf = requestAnimationFrame(loop);
+        if (tick <= (after[2] ?? 0)) raf = requestAnimationFrame(loop);
     };
     const run = () => {
         cancelAnimationFrame(raf);
