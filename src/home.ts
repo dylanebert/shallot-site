@@ -1,4 +1,4 @@
-import { lockup, toSvg } from "@dylanebert/shallot/brand";
+import { lockup, toSvg } from "./brand/mark";
 import { AGENTS_LINK, CSS_PALETTE, FONTS, STYLE, THEME_SCRIPT, TOGGLE, top } from "./brand/theme";
 import type { DemoEntry } from "./roster";
 

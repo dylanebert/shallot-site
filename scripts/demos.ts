@@ -21,7 +21,7 @@ import { root } from "../src/site";
 //
 // The roster is the single source of truth — imported from `site/roster.ts`, which reads the
 // examples shipped by the installed Shallot package. Ejection and building are not re-implemented:
-// `scripts/build-site.ts` runs `shallot add`, installs the site's resolved package, and builds every
+// `scripts/build-site.ts` runs `shallot create <slug> --template <slug>`, installs the site's resolved package, and builds every
 // roster demo into `out/site/<slug>/`.
 
 const outDir = resolve(root, "out/site");

@@ -166,18 +166,25 @@ Options:
 
         try {
             console.log(`\n=== ${slug} ===`);
-            const add = Bun.spawnSync(
-                [process.execPath, resolve(shallotPackage, "bin/shallot.ts"), "add", slug, scratch],
-                { cwd: root, stdout: "inherit", stderr: "inherit" },
+            const create = Bun.spawnSync(
+                [
+                    process.execPath,
+                    resolve(shallotPackage, "bin/shallot.ts"),
+                    "create",
+                    slug,
+                    "--template",
+                    slug,
+                ],
+                { cwd: scratchParent, stdout: "inherit", stderr: "inherit" },
             );
-            if (add.exitCode !== 0) throw new Error(`shallot add failed for ${slug}`);
+            if (create.exitCode !== 0) throw new Error(`shallot create failed for ${slug}`);
 
             const packagePath = resolve(scratch, "package.json");
             const demoPkg = (await Bun.file(packagePath).json()) as {
                 dependencies?: Record<string, string>;
             };
             demoPkg.dependencies ??= {};
-            // shallot add writes the installed version. Install the resolved package directory
+            // shallot create writes the installed version. Install the resolved package directory
             // locally, then point the demo at that same tree so staged overlays and live links are
             // preserved without another registry lookup or a separate checkout.
             demoPkg.dependencies["@dylanebert/shallot"] = `file:${shallotPackage}`;

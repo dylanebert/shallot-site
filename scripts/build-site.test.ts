@@ -6,13 +6,13 @@ import { llmsTxt, siteIndex } from "../src/home";
 import { ROSTER } from "../src/roster";
 import { root, shallotPackage, shallotVersion } from "../src/site";
 
-test("the demo roster is exactly the installed package's addable examples", () => {
+test("the demo roster is exactly the installed package's templates", () => {
     const result = Bun.spawnSync(
-        [process.execPath, resolve(shallotPackage, "bin/shallot.ts"), "add"],
+        [process.execPath, resolve(shallotPackage, "bin/shallot.ts"), "create", "--help"],
         { cwd: root, stdout: "pipe", stderr: "pipe" },
     );
     expect(result.exitCode).toBe(0);
-    const listed = [...result.stdout.toString().matchAll(/^ {2}([a-z0-9-]+) — /gm)].map(
+    const listed = [...result.stdout.toString().matchAll(/^ {4}([a-z0-9-]+) — /gm)].map(
         ([, slug]) => slug,
     );
     expect(ROSTER.map(({ slug }) => slug)).toEqual(listed);
@@ -27,14 +27,21 @@ test("site labels and source links identify the installed Shallot version", () =
     expect(docs).toContain(`/shallot/v${shallotVersion}/README.md`);
 });
 
-test("shallot add writes the installed Shallot version into an ejected example manifest", () => {
-    const temp = mkdtempSync(join(tmpdir(), "shallot-site-add-"));
+test("shallot create writes the installed Shallot version into an ejected example manifest", () => {
+    const temp = mkdtempSync(join(tmpdir(), "shallot-site-create-"));
     const slug = ROSTER[0]!.slug;
     const destination = join(temp, slug);
     try {
         const result = Bun.spawnSync(
-            [process.execPath, resolve(shallotPackage, "bin/shallot.ts"), "add", slug, destination],
-            { cwd: root, stdout: "pipe", stderr: "pipe" },
+            [
+                process.execPath,
+                resolve(shallotPackage, "bin/shallot.ts"),
+                "create",
+                slug,
+                "--template",
+                slug,
+            ],
+            { cwd: temp, stdout: "pipe", stderr: "pipe" },
         );
         expect(result.exitCode).toBe(0);
         const manifest = JSON.parse(readFileSync(join(destination, "package.json"), "utf8")) as {

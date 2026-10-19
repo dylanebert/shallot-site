@@ -61,8 +61,7 @@ const BUILDER_FILES = [
     "scripts/demos.ts",
     "node_modules/@dylanebert/shallot/package.json",
     "node_modules/@dylanebert/shallot/bin/shallot.ts",
-    "node_modules/@dylanebert/shallot/src/cli/add.ts",
-    "node_modules/@dylanebert/shallot/src/cli/add-fragments.ts",
+    "node_modules/@dylanebert/shallot/src/cli/create.ts",
 ];
 
 function filesUnder(rootDir: string): string[] {

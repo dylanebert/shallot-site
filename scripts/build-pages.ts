@@ -1,15 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-    DARK,
-    fromBlocks,
-    type Grid,
-    LIGHT,
-    lockup,
-    MARK,
-    toSvg,
-    word,
-} from "@dylanebert/shallot/brand";
+import { DARK, fromBlocks, type Grid, LIGHT, lockup, MARK, toSvg, word } from "../src/brand/mark";
 import { brandPage } from "../src/brand/page";
 import { toPng } from "../src/brand/png";
 import { llmsTxt, siteIndex } from "../src/home";
@@ -94,7 +85,7 @@ export async function buildBrand(
     write("wordmark.svg", toSvg(word(), DARK, 1));
     write("wordmark.png", toPng(word(), DARK, 8));
     write("mark.txt", `${halfBlockText(mark)}\n`);
-    const brandModule = Bun.resolveSync("@dylanebert/shallot/brand", root);
+    const brandModule = resolve(root, "src/brand/mark.ts");
     write("mark.ts", readFileSync(brandModule, "utf8"));
 }
 

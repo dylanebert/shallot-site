@@ -1,6 +1,6 @@
 // Datadog RUM browser-app credentials — the one place a rotation edits. A RUM `clientToken` is
 // public by design (it ships in every RUM customer's HTML), so committing it here is normal.
-// The application lives in the Dogfood org (ID 1975629), app name shallot-site.
+// The application lives in the Dylan Sandbox 001 org, app name shallot-site.
 export const RUM_CONFIG = {
     applicationId: "a5ffefd9-8f32-49dd-b8ae-ff31988e6bfe",
     clientToken: "pube2bd4a743b9fd4d05457e14b56fa53c5",
