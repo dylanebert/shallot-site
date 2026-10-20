@@ -7,7 +7,7 @@
       "devDependencies": {
         "@biomejs/biome": "^2.5.13",
         "@datadog/datadog-ci": "5.24.0",
-        "@dylanebert/shallot": "0.10.0",
+        "@dylanebert/shallot": "0.10.1-next.3",
         "@types/bun": "^1.4.3",
         "@types/node": "^26.0.0",
         "playwright": "^1.63.0",
@@ -71,7 +71,7 @@
 
     "@datadog/datadog-ci": ["@datadog/datadog-ci@5.24.0", "", { "bin": "dist/bundle.js" }, "sha512-372n3uP0B3ypIjdjb4Gmb65XaAwYMz2TOIDB89thqaxMvYBOCKF2UvJepX9RCPq0RPsG1EXqRVILTtSW82j7Cg=="],
 
-    "@dylanebert/shallot": ["@dylanebert/shallot@0.10.0", "", { "dependencies": { "@types/node": "^26.6.3", "@webgpu/types": "^0.1.74", "unplugin-typegpu": "~0.12.6" }, "peerDependencies": { "playwright": "^1.63.0", "typegpu": "~0.12.8", "vite": "^8.0.0", "webgpu": "^0.6.2" }, "optionalPeers": ["playwright", "webgpu"], "bin": { "shallot": "bin/shallot.ts" } }, "sha512-eP7I/f4rTEGF+eLsO5KFLjbSj6qcP8KRJuF2N6xqxav1qPkOZTkaTUvKlEIQ0VnXCig1yTWUSyIhXZyIUPf8lA=="],
+    "@dylanebert/shallot": ["@dylanebert/shallot@0.10.1-next.3", "", { "dependencies": { "@types/node": "^26.6.5", "@webgpu/types": "^0.1.74", "unplugin-typegpu": "~0.12.6" }, "peerDependencies": { "playwright": "^1.64.1", "typegpu": "~0.12.8", "vite": "^8.0.0", "webgpu": "^0.6.2" }, "optionalPeers": ["playwright", "webgpu"], "bin": { "shallot": "bin/shallot.ts" } }, "sha512-Ljr7IO7ReXiDHpSY+ap2EY9hOO4d88fpaI9119itzhAW/cB8Zm5RmDBcFoPMtfPGuOzaBEyIy9PneY+S7X72Iw=="],
 
     "@emnapi/runtime": ["@emnapi/runtime@1.11.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA=="],
 
@@ -379,7 +379,7 @@
 
     "@babel/generator/@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@dylanebert/shallot/@types/node": ["@types/node@26.6.3", "", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-dsqMQQoeTLqu9wynDD00q573mNzso3IdQOAfHRJqLCcmCFPoGo9A1bDpUcv/9tnKpErQWv9uKeGfl37EIS02Yg=="],
+    "@dylanebert/shallot/@types/node": ["@types/node@26.6.5", "", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg=="],
 
     "@jridgewell/gen-mapping/@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
