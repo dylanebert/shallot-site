@@ -28,7 +28,7 @@ export async function bundleClient(): Promise<string> {
     return await output.text();
 }
 
-/** Centre a grid in a square frame; the favicon frame around the 12×14 mark. */
+/** Center a grid in a square frame; the favicon frame around the 12×14 mark. */
 function framed(grid: ReturnType<typeof fromBlocks>, size: number): ReturnType<typeof fromBlocks> {
     const w = grid[0]?.length ?? 0;
     const h = grid.length;
@@ -91,7 +91,7 @@ export async function buildBrand(
 
 /** Writes the home index, `llms.txt`, and the brand pages. `rumMode` picks the Datadog env
  * derivation the pages carry: the hostname-derived prod snippet tags a localhost preview
- * "local", so a standalone pages build uses it even while labelling itself staging. */
+ * "local", so a standalone pages build uses it even while labeling itself staging. */
 export async function buildPages(
     outDir: string,
     version: string,

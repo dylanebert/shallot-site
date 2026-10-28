@@ -138,7 +138,7 @@ export function toSvg(grid: Grid, palette: Palette, scale: number = 1): string {
 // --- splash ---------------------------------------------------------------------------------
 //
 // Doubling: pixels switch on in place in ordered-dither (Bayer) sequence, in beats that shorten,
-// centre outwards within each dither level. Each pixel lands dim and goes full a tick later. On
+// center outwards within each dither level. Each pixel lands dim and goes full a tick later. On
 // the hit the name types a letter every two ticks; the cursor stays six ticks after the last
 // letter and goes out. Thirty-five ticks a second. Every frame is a grid, so the same function drives
 // the page and an ANSI terminal.
@@ -187,7 +187,7 @@ function landing(grid: Grid): Map<Point, number> {
     const rnd = lcg(5);
     const jitter = new Map(pixels.map((p) => [p, rnd()]));
     const key = (p: Point) => (BAYER[p.y % 4] as readonly number[])[p.x % 4] as number;
-    // centre of mass of the lit pixels: within one dither level the nearest cells land first, so
+    // center of mass of the lit pixels: within one dither level the nearest cells land first, so
     // the sparse early beats read as one cluster growing outwards rather than scattered dust
     const cx = pixels.reduce((a, p) => a + p.x, 0) / pixels.length;
     const cy = pixels.reduce((a, p) => a + p.y, 0) / pixels.length;
