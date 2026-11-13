@@ -7,7 +7,7 @@
       "devDependencies": {
         "@biomejs/biome": "^2.5.13",
         "@datadog/datadog-ci": "5.24.0",
-        "@dylanebert/shallot": "0.10.3",
+        "@dylanebert/shallot": "0.10.4-next.1",
         "@types/bun": "^1.4.3",
         "@types/node": "^26.0.0",
         "playwright": "^1.63.0",
@@ -71,7 +71,7 @@
 
     "@datadog/datadog-ci": ["@datadog/datadog-ci@5.24.0", "", { "bin": "dist/bundle.js" }, "sha512-372n3uP0B3ypIjdjb4Gmb65XaAwYMz2TOIDB89thqaxMvYBOCKF2UvJepX9RCPq0RPsG1EXqRVILTtSW82j7Cg=="],
 
-    "@dylanebert/shallot": ["@dylanebert/shallot@0.10.3", "", { "dependencies": { "@types/node": "^26.6.5", "@webgpu/types": "^0.1.74", "unplugin-typegpu": "~0.12.6" }, "peerDependencies": { "playwright": "^1.64.1", "typegpu": "~0.12.8", "vite": "^8.0.0", "webgpu": "^0.6.2", "wrangler": "4.151.3" }, "optionalPeers": ["playwright", "webgpu", "wrangler"], "bin": { "shallot": "dist/cli/shallot.js" } }, "sha512-StYERJ59o8Yhnng602pXCYpvryVwwUWLY7mJ1Eh/dy+HCwrmg+Ooy1BxZQqRMwInjnnaii97GWZaeRkjtGI86A=="],
+    "@dylanebert/shallot": ["@dylanebert/shallot@0.10.4-next.1", "", { "dependencies": { "@types/node": "^26.6.5", "@webgpu/types": "^0.1.74", "unplugin-typegpu": "~0.12.6" }, "peerDependencies": { "playwright": "^1.64.1", "typegpu": "~0.12.8", "vite": "^8.0.0", "webgpu": "^0.6.2", "wrangler": "4.151.3" }, "optionalPeers": ["playwright", "webgpu", "wrangler"], "bin": { "shallot": "dist/cli/shallot.js" } }, "sha512-C8U137BGYqK/DEFb/6WEl5XPGPxQYssV4ujxXhGiSUkxPuhnWZPCquTZ2ttXcFqyCsnxQHtVgtQPW4TEOPOR2w=="],
 
     "@emnapi/runtime": ["@emnapi/runtime@1.11.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA=="],
 
